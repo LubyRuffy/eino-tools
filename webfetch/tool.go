@@ -1,4 +1,4 @@
-package fetchurl
+package webfetch
 
 import (
 	"context"
@@ -19,7 +19,7 @@ import (
 	"github.com/go-rod/rod/lib/launcher"
 )
 
-const ToolName = "fetch_url"
+const ToolName = "web_fetch"
 
 type Cache interface {
 	Get(key string) (string, bool, error)
@@ -36,7 +36,15 @@ type CookieProvider interface {
 	GetCookies(domain string) []RequestCookie
 }
 
+type ProtectedDomains interface {
+	Mark(input string)
+	Contains(domain string) bool
+}
+
+type HTMLFetcher func(ctx context.Context, rawURL string) (string, error)
 type RenderFetcher func(ctx context.Context, rawURL string) (string, error)
+type BrowserFetcher func(ctx context.Context, rawURL string, render bool) (string, error)
+type ChallengeDetector func(err error) (string, bool)
 type HeaderProvider func(rawURL string) http.Header
 
 type ChallengeRequest struct {
@@ -52,7 +60,11 @@ type Config struct {
 	Cache                  Cache
 	HeaderProvider         HeaderProvider
 	CookieProvider         CookieProvider
+	HTMLFetcher            HTMLFetcher
 	RenderFetcher          RenderFetcher
+	BrowserFetch           BrowserFetcher
+	ChallengeDetector      ChallengeDetector
+	ProtectedDomains       ProtectedDomains
 	ChallengeHandler       ChallengeHandler
 	ChallengeTimeoutMS     int
 	ShouldPassthroughError shared.ErrorPassthrough
@@ -63,7 +75,11 @@ type Tool struct {
 	cache                  Cache
 	headerProvider         HeaderProvider
 	cookieProvider         CookieProvider
+	htmlFetcher            HTMLFetcher
 	renderFetcher          RenderFetcher
+	browserFetch           BrowserFetcher
+	challengeDetector      ChallengeDetector
+	protectedDomains       ProtectedDomains
 	challengeHandler       ChallengeHandler
 	challengeTimeoutMS     int
 	shouldPassthroughError shared.ErrorPassthrough
@@ -83,6 +99,9 @@ func New(cfg Config) (*Tool, error) {
 		cache:                  cfg.Cache,
 		headerProvider:         cfg.HeaderProvider,
 		cookieProvider:         cfg.CookieProvider,
+		browserFetch:           cfg.BrowserFetch,
+		challengeDetector:      cfg.ChallengeDetector,
+		protectedDomains:       cfg.ProtectedDomains,
 		challengeHandler:       cfg.ChallengeHandler,
 		challengeTimeoutMS:     timeoutMS,
 		shouldPassthroughError: cfg.ShouldPassthroughError,
@@ -91,6 +110,11 @@ func New(cfg Config) (*Tool, error) {
 		t.renderFetcher = cfg.RenderFetcher
 	} else {
 		t.renderFetcher = t.fetchRenderedMarkdown
+	}
+	if cfg.HTMLFetcher != nil {
+		t.htmlFetcher = cfg.HTMLFetcher
+	} else {
+		t.htmlFetcher = t.fetchHTML
 	}
 	return t, nil
 }
@@ -134,6 +158,10 @@ func (t *Tool) Fetch(ctx context.Context, rawURL string, render bool) (string, e
 		return "", fmt.Errorf("URL is required")
 	}
 
+	if t.shouldUseBrowserFetch(rawURL) {
+		return t.executeBrowserFetch(ctx, rawURL, render)
+	}
+
 	cacheKey := strings.TrimSpace(rawURL)
 	renderCacheKey := fmt.Sprintf("%s::render", cacheKey)
 	if render {
@@ -156,24 +184,37 @@ func (t *Tool) Fetch(ctx context.Context, rawURL string, render bool) (string, e
 
 	result, err := t.executeFetch(ctx, rawURL, render)
 	if err != nil {
-		if t.challengeHandler != nil && (cloudflare.IsChallengeError(err) || cloudflare.IsLikelyChallengeText(err.Error())) {
-			targetURL := challengeURLFromError(err, rawURL)
-			if handoffErr := t.challengeHandler(ctx, ChallengeRequest{
-				ToolName:  ToolName,
-				URL:       targetURL,
-				TimeoutMS: t.challengeTimeoutMS,
-			}); handoffErr != nil {
-				return "", handoffErr
+		if challengeURL, isChallenge := t.detectChallenge(err, rawURL); isChallenge {
+			if t.protectedDomains != nil {
+				t.protectedDomains.Mark(challengeURL)
 			}
-			result, err = t.executeFetch(ctx, rawURL, render)
-			if err != nil {
-				if cloudflare.IsChallengeError(err) || cloudflare.IsLikelyChallengeText(err.Error()) {
-					return "", fmt.Errorf("Cloudflare challenge still exists after manual verification, please retry manual verification")
+			if browserResult, browserErr := t.tryBrowserFetch(ctx, rawURL, render); browserErr == nil && strings.TrimSpace(browserResult) != "" {
+				result = browserResult
+				err = nil
+			} else if browserErr != nil {
+				err = browserErr
+			}
+		}
+
+		if err != nil {
+			if targetURL, isChallenge := t.detectChallenge(err, rawURL); t.challengeHandler != nil && isChallenge {
+				if handoffErr := t.challengeHandler(ctx, ChallengeRequest{
+					ToolName:  ToolName,
+					URL:       targetURL,
+					TimeoutMS: t.challengeTimeoutMS,
+				}); handoffErr != nil {
+					return "", handoffErr
 				}
+				result, err = t.executeFetch(ctx, rawURL, render)
+				if err != nil {
+					if _, stillChallenge := t.detectChallenge(err, rawURL); stillChallenge {
+						return "", fmt.Errorf("Cloudflare challenge still exists after manual verification, please retry manual verification")
+					}
+					return "", err
+				}
+			} else {
 				return "", err
 			}
-		} else {
-			return "", err
 		}
 	}
 
@@ -185,12 +226,59 @@ func (t *Tool) Fetch(ctx context.Context, rawURL string, render bool) (string, e
 	return result, nil
 }
 
+func (t *Tool) detectChallenge(err error, fallbackURL string) (string, bool) {
+	if err == nil {
+		return "", false
+	}
+	if cloudflare.IsChallengeError(err) {
+		return challengeURLFromError(err, fallbackURL), true
+	}
+	if t.challengeDetector != nil {
+		if detectedURL, ok := t.challengeDetector(err); ok {
+			detectedURL = strings.TrimSpace(detectedURL)
+			if detectedURL == "" {
+				detectedURL = strings.TrimSpace(fallbackURL)
+			}
+			return detectedURL, true
+		}
+	}
+	if cloudflare.IsLikelyChallengeText(err.Error()) {
+		return challengeURLFromError(err, fallbackURL), true
+	}
+	return "", false
+}
+
+func (t *Tool) shouldUseBrowserFetch(rawURL string) bool {
+	if t == nil || t.protectedDomains == nil || t.browserFetch == nil {
+		return false
+	}
+	domain := cloudflare.ExtractDomainFromURL(rawURL)
+	if domain == "" {
+		return false
+	}
+	return t.protectedDomains.Contains(domain)
+}
+
+func (t *Tool) executeBrowserFetch(ctx context.Context, rawURL string, render bool) (string, error) {
+	if t == nil || t.browserFetch == nil {
+		return "", fmt.Errorf("browser fetch is not configured")
+	}
+	return t.browserFetch(ctx, rawURL, render)
+}
+
+func (t *Tool) tryBrowserFetch(ctx context.Context, rawURL string, render bool) (string, error) {
+	if t == nil || t.browserFetch == nil {
+		return "", nil
+	}
+	return t.browserFetch(ctx, rawURL, render)
+}
+
 func (t *Tool) executeFetch(ctx context.Context, rawURL string, render bool) (string, error) {
 	if render {
 		return t.renderFetcher(ctx, rawURL)
 	}
 
-	htmlContent, err := t.fetchHTML(ctx, rawURL)
+	htmlContent, err := t.htmlFetcher(ctx, rawURL)
 	if err != nil {
 		return "", err
 	}
@@ -453,13 +541,6 @@ func ExtractReadableText(htmlContent, pageURL string) (string, error) {
 	return text, nil
 }
 
-func IsEmptyContentError(err error) bool {
-	if err == nil {
-		return false
-	}
-	return strings.Contains(err.Error(), "empty content")
-}
-
 func ShouldRetryWithRender(content string) bool {
 	trimmed := strings.TrimSpace(content)
 	if trimmed == "" {
@@ -481,10 +562,8 @@ func ShouldRetryWithRender(content string) bool {
 func challengeURLFromError(err error, fallbackURL string) string {
 	if err != nil {
 		var challengeErr *cloudflare.ChallengeError
-		if errors.As(err, &challengeErr) {
-			if strings.TrimSpace(challengeErr.URL) != "" {
-				return strings.TrimSpace(challengeErr.URL)
-			}
+		if errors.As(err, &challengeErr) && strings.TrimSpace(challengeErr.URL) != "" {
+			return strings.TrimSpace(challengeErr.URL)
 		}
 	}
 	return strings.TrimSpace(fallbackURL)

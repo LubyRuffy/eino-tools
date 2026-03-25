@@ -4,9 +4,18 @@
 
 ## 当前包含
 
-- `web_search`
-- `fetch_url`
-- `run_bash_command`
+- `websearch` -> `web_search`
+- `webfetch` -> `web_fetch`
+- `exec` -> `exec`
+- `read` / `write` / `edit`
+- `ls` / `tree` / `glob` / `grep`
+- `pythonrunner` -> `python_runner`
+- `screenshot`
+
+兼容保留：
+
+- `fetchurl`
+- `bashcmd`
 
 ## 快速开始
 
@@ -22,31 +31,31 @@ if err != nil {
 _ = searchTool
 ```
 
-### `fetch_url`
+### `web_fetch`
 
 ```go
-fetchTool, err := fetchurl.New(fetchurl.Config{})
+fetchTool, err := webfetch.New(webfetch.Config{})
 if err != nil {
 	panic(err)
 }
 _ = fetchTool
 ```
 
-### `run_bash_command`
+### `exec`
 
 ```go
-bashTool, err := bashcmd.New(bashcmd.Config{
+execTool, err := exec.New(exec.Config{
 	DefaultBaseDir: ".",
 })
 if err != nil {
 	panic(err)
 }
-_ = bashTool
+_ = execTool
 ```
 
 ## 常见使用方式
 
 1. 直接把工具注册到 Eino agent
-2. 在业务仓库中包一层 adapter，注入缓存、路径策略与挑战回调
-3. 独立复用 `fetch_url` 或 `run_bash_command` 的能力模块
+2. 在业务仓库中包一层 adapter，注入缓存、cookie 源、路径策略与挑战回调
+3. 直接复用当前命名的结构化文件工具和运行工具
 4. 用宿主仓库的 `replace` 指向本地工作目录做联调，再切正式 tag
