@@ -107,7 +107,7 @@ func (t *Tool) Info(ctx context.Context) (*schema.ToolInfo, error) {
 			},
 			"render": {
 				Type:     schema.Boolean,
-				Desc:     "Optional: whether to render the page with a headless browser. Default false.",
+				Desc:     "Optional: whether to render the page before extracting content. Default false.",
 				Required: false,
 			},
 		}),

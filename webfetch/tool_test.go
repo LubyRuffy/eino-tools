@@ -122,6 +122,23 @@ func TestTool_Fetch_UsesInjectedHTMLFetcher(t *testing.T) {
 	assert.Contains(t, result, "custom html")
 }
 
+func TestTool_Fetch_RenderTrueUsesInjectedRenderFetcher(t *testing.T) {
+	called := false
+	tl, err := New(Config{
+		RenderFetcher: func(ctx context.Context, rawURL string) (string, error) {
+			called = true
+			assert.Equal(t, "https://example.com/rendered", rawURL)
+			return "# Injected Render\n\ncustom markdown", nil
+		},
+	})
+	require.NoError(t, err)
+
+	result, fetchErr := tl.Fetch(context.Background(), "https://example.com/rendered", true)
+	require.NoError(t, fetchErr)
+	assert.True(t, called)
+	assert.Equal(t, "# Injected Render\n\ncustom markdown", result)
+}
+
 func TestTool_Fetch_AppliesDefaultHeadersAndCookies(t *testing.T) {
 	var receivedUserAgent string
 	var receivedAccept string

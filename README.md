@@ -41,6 +41,8 @@ if err != nil {
 _ = fetchTool
 ```
 
+宿主若希望接管 `render=true` 的执行后端，可注入 `RenderFetcher`；未注入时工具会继续使用库内建的默认 render 实现，保证兼容。
+
 ### `exec`
 
 ```go

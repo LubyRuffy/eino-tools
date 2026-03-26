@@ -35,6 +35,7 @@
 - `CookieProvider`
 - `HTMLFetcher`
 - `RenderFetcher`
+  - `render=true` 的宿主覆盖点；若未注入则保持工具内建的 Rod 渲染实现，保证兼容
 - `ChallengeDetector`
 - `ChallengeHandler`
 

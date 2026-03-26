@@ -13,6 +13,7 @@
 ## Changed
 
 - `webfetch` 现支持注入 `HTMLFetcher`、`HeaderProvider`、`CookieProvider` 与 `ChallengeDetector`，便于宿主按需覆盖抓取实现、补充请求头、提供 cookie 源并桥接自定义 Cloudflare 错误
+- `webfetch` 的 `RenderFetcher` 语义已固定为 `render=true` 的宿主 override 点；未注入时仍保留库内建 render 实现，兼容旧宿主
 - `webfetch` / `fetchurl` 的默认抓取链路现内置浏览器风格请求头与 cookie provider 注入，cookie/header 语义不再要求宿主自己重写 `fetchHTML`
 - 仓库主推荐入口已切到当前命名工具：`web_search`、`web_fetch`、`exec`、`read`、`edit`、`write`、`ls`、`tree`、`glob`、`grep`、`python_runner`、`screenshot`
 

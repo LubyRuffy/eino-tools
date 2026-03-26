@@ -56,11 +56,13 @@ type ChallengeRequest struct {
 type ChallengeHandler func(ctx context.Context, req ChallengeRequest) error
 
 type Config struct {
-	HTTPClient             *http.Client
-	Cache                  Cache
-	HeaderProvider         HeaderProvider
-	CookieProvider         CookieProvider
-	HTMLFetcher            HTMLFetcher
+	HTTPClient     *http.Client
+	Cache          Cache
+	HeaderProvider HeaderProvider
+	CookieProvider CookieProvider
+	HTMLFetcher    HTMLFetcher
+	// RenderFetcher lets the host override how render=true is executed.
+	// When nil, the tool keeps its built-in Rod-based render path for compatibility.
 	RenderFetcher          RenderFetcher
 	BrowserFetch           BrowserFetcher
 	ChallengeDetector      ChallengeDetector
@@ -131,7 +133,7 @@ func (t *Tool) Info(ctx context.Context) (*schema.ToolInfo, error) {
 			},
 			"render": {
 				Type:     schema.Boolean,
-				Desc:     "Optional: whether to render the page with a headless browser. Default false.",
+				Desc:     "Optional: whether to render the page before extracting content. Default false.",
 				Required: false,
 			},
 		}),
