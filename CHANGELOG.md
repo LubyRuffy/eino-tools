@@ -9,6 +9,8 @@
 - 新增 `internal/shared` 与 `internal/cloudflare` 共享能力及对应单元测试
 - 新增当前命名版本的通用工具包：`webfetch`、`exec`、`read`、`write`、`edit`、`ls`、`tree`、`glob`、`grep`、`pythonrunner`、`screenshot`
 - 新增 `internal/fsutil`、`internal/editutil`、`internal/screenshotutil` 共享 helper 及对应单元测试
+- 新增 `internal/mcpserver` 与 `cmd/mcpserver`
+- 新增 `docs/CLI.md` 与 `docs/CONFIG.md`
 
 ## Changed
 
@@ -16,7 +18,9 @@
 - `webfetch` 的 `RenderFetcher` 语义已固定为 `render=true` 的宿主 override 点；未注入时仍保留库内建 render 实现，兼容旧宿主
 - `webfetch` / `fetchurl` 的默认抓取链路现内置浏览器风格请求头与 cookie provider 注入，cookie/header 语义不再要求宿主自己重写 `fetchHTML`
 - 仓库主推荐入口已切到当前命名工具：`web_search`、`web_fetch`、`exec`、`read`、`edit`、`write`、`ls`、`tree`、`glob`、`grep`、`python_runner`、`screenshot`
+- `cmd/mcpserver` 默认支持 `stdio`、`SSE` 与 `streamable HTTP`
+- `cmd/mcpserver` 现把 `session_id` 与 `tool` 写入 stderr，便于按会话排障
 
 ## Fixed
 
-- 暂无
+- 删除兼容别名包 `fetchurl` 与 `bashcmd`，仓库对外只保留正式工具名
