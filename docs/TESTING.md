@@ -25,8 +25,8 @@ go build ./cmd/mcpserver
 
 - `websearch`：空 query、缓存命中、工具名
 - `webfetch`：空 URL、默认请求头/cookie 注入、注入 HTML fetcher、Cloudflare fallback、challenge handler 回调重试
-- `exec`：正常执行、`cwd/base_dir`、超时、受保护域名拦截
-- `read/write/edit/ls/tree/glob/grep`：路径解析、基本文件操作和 patch/glob/grep 语义
+- `exec`：正常执行、`cwd` 相对 `base_dir` 解析且允许落在边界外、超时、受保护域名拦截
+- `read/write/edit/ls/tree/glob/grep`：路径解析允许落在 `base_dir` 边界外、基本文件操作和 patch/glob/grep 语义
 - `pythonrunner`：空代码、requirements、执行结果结构
 - `screenshot`：路径规范化、区域解析、命令选择和 data URL
 - `internal/mcpserver`：正式工具列表、Eino 到 MCP 的 arguments 透传、`/sse` 和 `/mcp` 挂载、server 对客户端的工具列表暴露

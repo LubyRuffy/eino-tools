@@ -37,3 +37,25 @@ func TestTool_InvokableRun_WritesFile(t *testing.T) {
 	require.NoError(t, err)
 	assert.Equal(t, "hello", string(content))
 }
+
+func TestTool_InvokableRun_WritesFileOutsideBaseDir(t *testing.T) {
+	baseDir := t.TempDir()
+	outsideDir := t.TempDir()
+	targetPath := filepath.Join(outsideDir, "demo.txt")
+
+	tl, err := New(Config{DefaultBaseDir: baseDir})
+	require.NoError(t, err)
+
+	invokable, ok := any(tl).(interface {
+		InvokableRun(context.Context, string, ...tool.Option) (string, error)
+	})
+	require.True(t, ok)
+
+	result, runErr := invokable.InvokableRun(context.Background(), `{"file_path":"`+targetPath+`","content":"hello outside"}`)
+	require.NoError(t, runErr)
+	assert.Contains(t, result, "Updated file")
+
+	content, err := os.ReadFile(targetPath)
+	require.NoError(t, err)
+	assert.Equal(t, "hello outside", string(content))
+}

@@ -28,24 +28,23 @@ func TestIsPathWithin(t *testing.T) {
 	}
 }
 
-func TestResolvePathWithin_AllowsConfiguredPaths(t *testing.T) {
-	homeDir, err := os.UserHomeDir()
-	require.NoError(t, err)
-
+func TestResolvePathWithin_AllowsAbsolutePathOutsideBaseDir(t *testing.T) {
 	baseDir := t.TempDir()
-	allowedPaths := []string{"~/.codex", "~/.claude"}
+	outsidePath := filepath.Join(t.TempDir(), "random.txt")
 
-	pathValue, err := ResolvePathWithin(baseDir, filepath.Join(homeDir, ".codex", "skills"), allowedPaths)
+	pathValue, err := ResolvePathWithin(baseDir, outsidePath, nil)
 	require.NoError(t, err)
-	assert.NotEmpty(t, pathValue)
+	assert.Equal(t, outsidePath, pathValue)
 }
 
-func TestResolvePathWithin_BlocksPathsOutsideBaseDir(t *testing.T) {
-	baseDir := t.TempDir()
+func TestResolvePathWithin_AllowsRelativeTraversalOutsideBaseDir(t *testing.T) {
+	parentDir := t.TempDir()
+	baseDir := filepath.Join(parentDir, "base")
+	require.NoError(t, os.MkdirAll(baseDir, 0o755))
 
-	_, err := ResolvePathWithin(baseDir, "/tmp/random", nil)
-	require.Error(t, err)
-	assert.Contains(t, err.Error(), "outside base_dir")
+	pathValue, err := ResolvePathWithin(baseDir, "../target.txt", nil)
+	require.NoError(t, err)
+	assert.Equal(t, filepath.Join(parentDir, "target.txt"), pathValue)
 }
 
 func TestResolveBaseDir_UsesOverride(t *testing.T) {

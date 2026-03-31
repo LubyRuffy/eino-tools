@@ -48,6 +48,8 @@ if err != nil {
 _ = execTool
 ```
 
+`base_dir` 现在统一只作为相对路径解析锚点使用；`exec` 和文件读写类工具都允许最终路径落在 `base_dir` 之外。
+
 ### 启动 MCP Server
 
 ```bash

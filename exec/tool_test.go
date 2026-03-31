@@ -52,6 +52,21 @@ func TestTool_InvokableRun_ResolvesCWDWithinBaseDir(t *testing.T) {
 	assert.Contains(t, result, workDir)
 }
 
+func TestTool_InvokableRun_AllowsCWDOutsideBaseDir(t *testing.T) {
+	baseDir := t.TempDir()
+	workDir := t.TempDir()
+
+	tl, err := New(Config{
+		DefaultBaseDir: baseDir,
+		AllowedPaths:   []string{"~/.codex", "~/.claude"},
+	})
+	require.NoError(t, err)
+
+	result, runErr := tl.InvokableRun(context.Background(), `{"command":"pwd","cwd":"`+workDir+`"}`)
+	require.NoError(t, runErr)
+	assert.Contains(t, result, workDir)
+}
+
 func TestTool_InvokableRun_BlocksProtectedDomain(t *testing.T) {
 	store := cloudflare.NewProtectedDomains(0)
 	store.Mark("https://www.dogster.com/")

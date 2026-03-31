@@ -20,6 +20,7 @@
 - 仓库主推荐入口已切到当前命名工具：`web_search`、`web_fetch`、`exec`、`read`、`edit`、`write`、`ls`、`tree`、`glob`、`grep`、`python_runner`、`screenshot`
 - `cmd/mcpserver` 默认支持 `stdio`、`SSE` 与 `streamable HTTP`
 - `cmd/mcpserver` 现把 `session_id` 与 `tool` 写入 stderr，便于按会话排障
+- `exec` 以及 `read`、`write`、`edit`、`ls`、`tree`、`glob`、`grep`、`screenshot` 的路径参数现仅把 `base_dir` 作为相对路径解析锚点，不再要求最终路径位于 `base_dir` 内
 
 ## Fixed
 

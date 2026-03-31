@@ -28,6 +28,8 @@
 说明：
 
 - 统一传给 `exec`、`read`、`write`、`edit`、`ls`、`tree`、`glob`、`grep`、`screenshot` 等依赖文件系统路径的工具
+- 这些工具都会用它解析相对路径，但不再要求最终路径必须位于 `base_dir` 内
+- `base_dir` 现在主要用于给相对路径提供稳定锚点
 
 ### `--name`
 

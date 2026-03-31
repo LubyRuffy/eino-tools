@@ -42,7 +42,7 @@
 
 ### exec
 
-封装 `/bin/bash -c` 执行、路径限制、输出截断、超时与 Cloudflare 保护域名拦截。
+封装 `/bin/bash -c` 执行、工作目录解析、输出截断、超时与 Cloudflare 保护域名拦截。
 
 宿主可通过 `Config` 注入：
 
@@ -53,7 +53,7 @@
 
 ### 文件与截图工具
 
-`read/write/edit/ls/tree/glob/grep/screenshot` 共享 `internal/fsutil`、`internal/editutil` 与 `internal/screenshotutil`，把路径边界、patch 解析和平台差异统一收敛到内部 helper。
+`read/write/edit/ls/tree/glob/grep/screenshot` 共享 `internal/fsutil`、`internal/editutil` 与 `internal/screenshotutil`，把相对路径解析、patch 解析和平台差异统一收敛到内部 helper。
 
 ### MCP Server
 

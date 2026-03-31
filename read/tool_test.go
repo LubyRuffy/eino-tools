@@ -37,3 +37,22 @@ func TestTool_InvokableRun_ReadsPagedContent(t *testing.T) {
 	assert.Contains(t, out, "2|l2")
 	assert.Contains(t, out, "3|l3")
 }
+
+func TestTool_InvokableRun_ReadsFileOutsideBaseDir(t *testing.T) {
+	baseDir := t.TempDir()
+	outsideDir := t.TempDir()
+	targetPath := filepath.Join(outsideDir, "x.txt")
+	require.NoError(t, os.WriteFile(targetPath, []byte("external"), 0o644))
+
+	tl, err := New(Config{DefaultBaseDir: baseDir})
+	require.NoError(t, err)
+
+	invokable, ok := any(tl).(interface {
+		InvokableRun(context.Context, string, ...tool.Option) (string, error)
+	})
+	require.True(t, ok)
+
+	out, runErr := invokable.InvokableRun(context.Background(), `{"file_path":"`+targetPath+`"}`)
+	require.NoError(t, runErr)
+	assert.Contains(t, out, "external")
+}
