@@ -6,6 +6,8 @@ import (
 	"fmt"
 	"os"
 	osExec "os/exec"
+	"path/filepath"
+	"strconv"
 	"strings"
 	"syscall"
 	"time"
@@ -74,7 +76,7 @@ func New(cfg Config) (*Tool, error) {
 	}
 	shellPath := strings.TrimSpace(cfg.ShellPath)
 	if shellPath == "" {
-		shellPath = "/bin/bash"
+		shellPath, _ = resolveShellPath()
 	}
 	timeoutMS := cfg.ChallengeTimeoutMS
 	if timeoutMS <= 0 {
@@ -291,7 +293,8 @@ func runCommandOnce(
 	extraEnv map[string]string,
 	maxOutputBytes int,
 ) (map[string]interface{}, error) {
-	cmd := osExec.CommandContext(ctx, shellPath, "-c", command)
+	execPath, execArgs := buildShellInvocation(shellPath, command)
+	cmd := osExec.CommandContext(ctx, execPath, execArgs...)
 	cmd.Dir = workDir
 	cmd.SysProcAttr = &syscall.SysProcAttr{Setpgid: true}
 
@@ -371,6 +374,36 @@ func runCommandOnce(
 		payload["error"] = fmt.Sprintf("command timeout or canceled: %v", ctx.Err())
 	}
 	return payload, nil
+}
+
+func resolveShellPath() (string, error) {
+	shellPath := strings.TrimSpace(os.Getenv("SHELL"))
+	if shellPath != "" {
+		return shellPath, nil
+	}
+	return "/bin/bash", nil
+}
+
+func buildShellInvocation(shellPath string, command string) (string, []string) {
+	shellPath = strings.TrimSpace(shellPath)
+	if shellPath == "" {
+		shellPath = "/bin/bash"
+	}
+
+	if strings.EqualFold(filepath.Base(shellPath), "zsh") || strings.EqualFold(filepath.Base(shellPath), "zsh.exe") {
+		home, _ := os.UserHomeDir()
+		if home == "" {
+			home = os.Getenv("HOME")
+		}
+		if home != "" {
+			zshrcPath := filepath.Join(home, ".zshrc")
+			if _, err := os.Stat(zshrcPath); err == nil {
+				return shellPath, []string{"-lc", "source " + strconv.Quote(zshrcPath) + "; eval " + strconv.Quote(command)}
+			}
+		}
+	}
+
+	return shellPath, []string{"-lc", command}
 }
 
 func isLikelyDirectHTTPCommand(command string) bool {
