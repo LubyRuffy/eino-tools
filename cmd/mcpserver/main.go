@@ -59,6 +59,9 @@ func parseConfig(args []string) (internalmcp.Config, error) {
 	fs.StringVar(&cfg.Transport, "transport", internalmcp.TransportAll, "stdio, http, or all")
 	fs.StringVar(&cfg.Addr, "addr", internalmcp.DefaultAddr, "HTTP listen address")
 	fs.StringVar(&cfg.BaseDir, "base-dir", "", "base directory passed to filesystem-oriented tools")
+	fs.StringVar(&cfg.HTTPProxy, "http-proxy", "", "HTTP proxy URL for network tools")
+	fs.StringVar(&cfg.HTTPSProxy, "https-proxy", "", "HTTPS proxy URL for network tools")
+	fs.StringVar(&cfg.NoProxy, "no-proxy", "", "comma-separated hosts that bypass the proxy for network tools")
 	fs.StringVar(&cfg.Name, "name", internalmcp.DefaultName, "MCP server name")
 	fs.StringVar(&cfg.Version, "version", version, "MCP server version")
 

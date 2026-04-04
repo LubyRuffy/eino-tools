@@ -27,3 +27,15 @@ func TestParseConfig_RejectsUnknownTransport(t *testing.T) {
 	_, err := parseConfig([]string{"--transport", "invalid"})
 	require.Error(t, err)
 }
+
+func TestParseConfig_AcceptsProxyFlags(t *testing.T) {
+	cfg, err := parseConfig([]string{
+		"--http-proxy", "http://127.0.0.1:7890",
+		"--https-proxy", "http://127.0.0.1:7891",
+		"--no-proxy", "localhost,127.0.0.1,.internal",
+	})
+	require.NoError(t, err)
+	require.Equal(t, "http://127.0.0.1:7890", cfg.HTTPProxy)
+	require.Equal(t, "http://127.0.0.1:7891", cfg.HTTPSProxy)
+	require.Equal(t, "localhost,127.0.0.1,.internal", cfg.NoProxy)
+}

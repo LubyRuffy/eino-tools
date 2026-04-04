@@ -20,11 +20,23 @@ import (
 func NewToolset(ctx context.Context, cfg Config) ([]EinoTool, error) {
 	cfg = cfg.WithDefaults()
 
-	webSearchTool, err := websearch.New(ctx, websearch.Config{})
+	proxyCfg := resolveProxyConfig(cfg, nil)
+	networkHTTPClient, err := newNetworkHTTPClient(cfg, nil)
 	if err != nil {
 		return nil, err
 	}
-	webFetchTool, err := webfetch.New(webfetch.Config{})
+
+	webSearchTool, err := websearch.New(ctx, websearch.Config{
+		HTTPClient:  networkHTTPClient,
+		ProxyConfig: proxyCfg,
+	})
+	if err != nil {
+		return nil, err
+	}
+	webFetchTool, err := webfetch.New(webfetch.Config{
+		HTTPClient:  networkHTTPClient,
+		ProxyConfig: proxyCfg,
+	})
 	if err != nil {
 		return nil, err
 	}

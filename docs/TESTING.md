@@ -8,6 +8,7 @@
 
 ```bash
 go test ./... -count=1
+go test ./netproxy -count=1
 go test ./websearch -count=1
 go test ./webfetch ./exec ./read ./write ./edit ./ls ./tree ./glob ./grep ./pythonrunner ./screenshot -count=1
 go test ./internal/mcpserver ./cmd/mcpserver -count=1
@@ -23,14 +24,16 @@ go build ./cmd/mcpserver
 
 ## 当前覆盖
 
+- `netproxy`：显式配置优先级、HTTP client 代理行为、Chromium 代理参数映射
 - `websearch`：空 query、缓存命中、工具名
-- `webfetch`：空 URL、默认请求头/cookie 注入、注入 HTML fetcher、Cloudflare fallback、challenge handler 回调重试
+- `webfetch`：空 URL、默认请求头/cookie 注入、注入 HTML fetcher、默认 render 代理 launcher、Cloudflare fallback、challenge handler 回调重试
 - `exec`：正常执行、`cwd` 相对 `base_dir` 解析且允许落在边界外、超时、受保护域名拦截
 - `read/write/edit/ls/tree/glob/grep`：路径解析允许落在 `base_dir` 边界外、基本文件操作和 patch/glob/grep 语义
 - `pythonrunner`：空代码、requirements、执行结果结构
 - `screenshot`：路径规范化、区域解析、命令选择和 data URL
 - `internal/mcpserver`：正式工具列表、Eino 到 MCP 的 arguments 透传、`/sse` 和 `/mcp` 挂载、server 对客户端的工具列表暴露
-- `cmd/mcpserver`：默认参数、合法传输值、非法传输值校验
+- `internal/mcpserver`：网络工具统一代理配置的 CLI 优先级与环境变量回退
+- `cmd/mcpserver`：默认参数、合法传输值、非法传输值校验、代理 flag 解析
 
 ## 手工冒烟验证
 
@@ -44,6 +47,15 @@ go run ./cmd/mcpserver --transport stdio
 
 ```bash
 go run ./cmd/mcpserver --transport http --addr :8080
+```
+
+### 代理
+
+```bash
+HTTP_PROXY=http://127.0.0.1:7890 \
+HTTPS_PROXY=http://127.0.0.1:7890 \
+NO_PROXY=localhost \
+go test ./cmd/mcpserver ./internal/mcpserver -count=1
 ```
 
 检查端点：

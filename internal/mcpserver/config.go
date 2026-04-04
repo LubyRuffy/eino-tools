@@ -16,11 +16,14 @@ const (
 )
 
 type Config struct {
-	Name      string
-	Version   string
-	BaseDir   string
-	Addr      string
-	Transport string
+	Name       string
+	Version    string
+	BaseDir    string
+	Addr       string
+	Transport  string
+	HTTPProxy  string
+	HTTPSProxy string
+	NoProxy    string
 }
 
 func (c Config) WithDefaults() Config {

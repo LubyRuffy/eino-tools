@@ -11,6 +11,7 @@
 - 新增 `internal/fsutil`、`internal/editutil`、`internal/screenshotutil` 共享 helper 及对应单元测试
 - 新增 `internal/mcpserver` 与 `cmd/mcpserver`
 - 新增 `docs/CLI.md` 与 `docs/CONFIG.md`
+- 新增 `cmd/mcpserver` 网络工具代理配置：`--http-proxy`、`--https-proxy`、`--no-proxy`
 
 ## Changed
 
@@ -20,6 +21,10 @@
 - 仓库主推荐入口已切到当前命名工具：`web_search`、`web_fetch`、`exec`、`read`、`edit`、`write`、`ls`、`tree`、`glob`、`grep`、`python_runner`、`screenshot`
 - `cmd/mcpserver` 默认支持 `stdio`、`SSE` 与 `streamable HTTP`
 - `cmd/mcpserver` 现把 `session_id` 与 `tool` 写入 stderr，便于按会话排障
+- `cmd/mcpserver` 现按“CLI 参数优先、环境变量兜底”的规则为 `web_search` 与 `web_fetch` 注入共享代理 `HTTPClient`
+- README / ARCHITECTURE / CONFIG 文档现明确区分 CLI 代理配置与 package 注入方式，并补充 `render=true` 代理边界说明
+- 新增公开 `netproxy` package，统一承载 `web_search`、`web_fetch` 普通抓取与默认 `render=true` 的代理配置
+- `web_fetch` 默认 `render=true` 现可复用与普通 HTTP 抓取一致的代理配置
 - `exec` 以及 `read`、`write`、`edit`、`ls`、`tree`、`glob`、`grep`、`screenshot` 的路径参数现仅把 `base_dir` 作为相对路径解析锚点，不再要求最终路径位于 `base_dir` 内
 
 ## Fixed

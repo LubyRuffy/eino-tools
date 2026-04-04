@@ -8,6 +8,7 @@ import (
 	"time"
 
 	"github.com/LubyRuffy/eino-tools/internal/shared"
+	"github.com/LubyRuffy/eino-tools/netproxy"
 	duckduckgo "github.com/cloudwego/eino-ext/components/tool/duckduckgo/v2"
 	"github.com/cloudwego/eino/components/tool"
 	"github.com/cloudwego/eino/schema"
@@ -27,6 +28,7 @@ type SearchRunner interface {
 type Config struct {
 	Cache                  Cache
 	HTTPClient             *http.Client
+	ProxyConfig            netproxy.Config
 	SearchRunner           SearchRunner
 	MaxResults             int
 	ShouldPassthroughError shared.ErrorPassthrough
@@ -41,6 +43,14 @@ type Tool struct {
 func New(ctx context.Context, cfg Config) (*Tool, error) {
 	runner := cfg.SearchRunner
 	if runner == nil {
+		client := cfg.HTTPClient
+		if client == nil && cfg.ProxyConfig.Enabled() {
+			var err error
+			client, err = netproxy.NewHTTPClient(cfg.ProxyConfig)
+			if err != nil {
+				return nil, fmt.Errorf("failed to create proxy HTTP client: %w", err)
+			}
+		}
 		maxResults := cfg.MaxResults
 		if maxResults <= 0 {
 			maxResults = 10
@@ -50,8 +60,8 @@ func New(ctx context.Context, cfg Config) (*Tool, error) {
 			Timeout:    30 * time.Second,
 			MaxResults: maxResults,
 		}
-		if cfg.HTTPClient != nil {
-			searchCfg.HTTPClient = cfg.HTTPClient
+		if client != nil {
+			searchCfg.HTTPClient = client
 		}
 		searchTool, err := duckduckgo.NewTextSearchTool(ctx, searchCfg)
 		if err != nil {

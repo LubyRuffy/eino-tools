@@ -13,10 +13,12 @@ import (
 	readability "codeberg.org/readeck/go-readability/v2"
 	"github.com/LubyRuffy/eino-tools/internal/cloudflare"
 	"github.com/LubyRuffy/eino-tools/internal/shared"
+	"github.com/LubyRuffy/eino-tools/netproxy"
 	"github.com/cloudwego/eino/components/tool"
 	"github.com/cloudwego/eino/schema"
 	"github.com/go-rod/rod"
 	"github.com/go-rod/rod/lib/launcher"
+	"github.com/go-rod/rod/lib/launcher/flags"
 )
 
 const ToolName = "web_fetch"
@@ -57,6 +59,7 @@ type ChallengeHandler func(ctx context.Context, req ChallengeRequest) error
 
 type Config struct {
 	HTTPClient     *http.Client
+	ProxyConfig    netproxy.Config
 	Cache          Cache
 	HeaderProvider HeaderProvider
 	CookieProvider CookieProvider
@@ -74,6 +77,7 @@ type Config struct {
 
 type Tool struct {
 	httpClient             *http.Client
+	proxyConfig            netproxy.Config
 	cache                  Cache
 	headerProvider         HeaderProvider
 	cookieProvider         CookieProvider
@@ -89,6 +93,13 @@ type Tool struct {
 
 func New(cfg Config) (*Tool, error) {
 	client := cfg.HTTPClient
+	if client == nil && cfg.ProxyConfig.Enabled() {
+		var err error
+		client, err = netproxy.NewHTTPClient(cfg.ProxyConfig)
+		if err != nil {
+			return nil, fmt.Errorf("failed to create proxy HTTP client: %w", err)
+		}
+	}
 	if client == nil {
 		client = &http.Client{Timeout: 30 * time.Second}
 	}
@@ -98,6 +109,7 @@ func New(cfg Config) (*Tool, error) {
 	}
 	t := &Tool{
 		httpClient:             client,
+		proxyConfig:            cfg.ProxyConfig,
 		cache:                  cfg.Cache,
 		headerProvider:         cfg.HeaderProvider,
 		cookieProvider:         cfg.CookieProvider,
@@ -391,7 +403,7 @@ func normalizeCookiePath(path string) string {
 }
 
 func (t *Tool) fetchRenderedMarkdown(ctx context.Context, rawURL string) (string, error) {
-	browser, launch, err := launchRodBrowser(ctx, true)
+	browser, launch, err := launchRodBrowser(ctx, true, t.proxyConfig)
 	if err != nil {
 		return "", err
 	}
@@ -448,8 +460,11 @@ func (t *Tool) fetchRenderedMarkdown(ctx context.Context, rawURL string) (string
 	return markdown, nil
 }
 
-func launchRodBrowser(ctx context.Context, headless bool) (*rod.Browser, *launcher.Launcher, error) {
-	launch := launcher.New().Context(ctx).Headless(headless)
+func launchRodBrowser(ctx context.Context, headless bool, proxyCfg netproxy.Config) (*rod.Browser, *launcher.Launcher, error) {
+	launch, err := newRodLauncher(ctx, headless, proxyCfg)
+	if err != nil {
+		return nil, nil, err
+	}
 	controlURL, err := launch.Launch()
 	if err != nil {
 		return nil, nil, fmt.Errorf("failed to launch browser: %w", err)
@@ -460,6 +475,21 @@ func launchRodBrowser(ctx context.Context, headless bool) (*rod.Browser, *launch
 		return nil, nil, fmt.Errorf("failed to connect browser: %w", err)
 	}
 	return browser, launch, nil
+}
+
+func newRodLauncher(ctx context.Context, headless bool, proxyCfg netproxy.Config) (*launcher.Launcher, error) {
+	launch := launcher.New().Context(ctx).Headless(headless)
+	chromiumProxyCfg, err := netproxy.ChromiumConfig(proxyCfg)
+	if err != nil {
+		return nil, fmt.Errorf("failed to build browser proxy config: %w", err)
+	}
+	if chromiumProxyCfg.ProxyServer != "" {
+		launch.Set(flags.ProxyServer, chromiumProxyCfg.ProxyServer)
+	}
+	if chromiumProxyCfg.ProxyBypassList != "" {
+		launch.Set(flags.Flag("proxy-bypass-list"), chromiumProxyCfg.ProxyBypassList)
+	}
+	return launch, nil
 }
 
 func evaluateReadabilityMarkdown(page *rod.Page) (string, error) {

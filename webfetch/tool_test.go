@@ -9,6 +9,8 @@ import (
 	"testing"
 
 	"github.com/LubyRuffy/eino-tools/internal/cloudflare"
+	"github.com/LubyRuffy/eino-tools/netproxy"
+	"github.com/go-rod/rod/lib/launcher/flags"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
@@ -137,6 +139,20 @@ func TestTool_Fetch_RenderTrueUsesInjectedRenderFetcher(t *testing.T) {
 	require.NoError(t, fetchErr)
 	assert.True(t, called)
 	assert.Equal(t, "# Injected Render\n\ncustom markdown", result)
+}
+
+func TestNewRodLauncher_AppliesProxyConfig(t *testing.T) {
+	launch, err := newRodLauncher(context.Background(), true, netproxy.Config{
+		HTTPProxy:  "http://proxy-http:8080",
+		HTTPSProxy: "http://proxy-https:8443",
+		NoProxy:    "localhost,.svc",
+	})
+	require.NoError(t, err)
+	require.Equal(t, "http=http://proxy-http:8080;https=http://proxy-https:8443", launch.Get(flags.ProxyServer))
+
+	bypassValues, ok := launch.GetFlags(flags.Flag("proxy-bypass-list"))
+	require.True(t, ok)
+	require.Equal(t, []string{"localhost;*.svc;svc"}, bypassValues)
 }
 
 func TestTool_Fetch_AppliesDefaultHeadersAndCookies(t *testing.T) {
