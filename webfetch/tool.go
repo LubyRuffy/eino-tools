@@ -11,6 +11,7 @@ import (
 	"time"
 
 	readability "codeberg.org/readeck/go-readability/v2"
+	"github.com/LubyRuffy/eino-tools/browserbin"
 	"github.com/LubyRuffy/eino-tools/internal/cloudflare"
 	"github.com/LubyRuffy/eino-tools/internal/shared"
 	"github.com/LubyRuffy/eino-tools/netproxy"
@@ -73,6 +74,7 @@ type Config struct {
 	ChallengeHandler       ChallengeHandler
 	ChallengeTimeoutMS     int
 	ShouldPassthroughError shared.ErrorPassthrough
+	BrowserBin             string
 }
 
 type Tool struct {
@@ -89,6 +91,7 @@ type Tool struct {
 	challengeHandler       ChallengeHandler
 	challengeTimeoutMS     int
 	shouldPassthroughError shared.ErrorPassthrough
+	browserBin             string
 }
 
 func New(cfg Config) (*Tool, error) {
@@ -119,6 +122,7 @@ func New(cfg Config) (*Tool, error) {
 		challengeHandler:       cfg.ChallengeHandler,
 		challengeTimeoutMS:     timeoutMS,
 		shouldPassthroughError: cfg.ShouldPassthroughError,
+		browserBin:             strings.TrimSpace(cfg.BrowserBin),
 	}
 	if cfg.RenderFetcher != nil {
 		t.renderFetcher = cfg.RenderFetcher
@@ -403,7 +407,7 @@ func normalizeCookiePath(path string) string {
 }
 
 func (t *Tool) fetchRenderedMarkdown(ctx context.Context, rawURL string) (string, error) {
-	browser, launch, err := launchRodBrowser(ctx, true, t.proxyConfig)
+	browser, launch, err := launchRodBrowser(ctx, true, t.proxyConfig, t.browserBin)
 	if err != nil {
 		return "", err
 	}
@@ -460,8 +464,8 @@ func (t *Tool) fetchRenderedMarkdown(ctx context.Context, rawURL string) (string
 	return markdown, nil
 }
 
-func launchRodBrowser(ctx context.Context, headless bool, proxyCfg netproxy.Config) (*rod.Browser, *launcher.Launcher, error) {
-	launch, err := newRodLauncher(ctx, headless, proxyCfg)
+func launchRodBrowser(ctx context.Context, headless bool, proxyCfg netproxy.Config, browserBin string) (*rod.Browser, *launcher.Launcher, error) {
+	launch, err := newRodLauncher(ctx, headless, proxyCfg, browserBin)
 	if err != nil {
 		return nil, nil, err
 	}
@@ -477,8 +481,15 @@ func launchRodBrowser(ctx context.Context, headless bool, proxyCfg netproxy.Conf
 	return browser, launch, nil
 }
 
-func newRodLauncher(ctx context.Context, headless bool, proxyCfg netproxy.Config) (*launcher.Launcher, error) {
+func newRodLauncher(ctx context.Context, headless bool, proxyCfg netproxy.Config, browserBin string) (*launcher.Launcher, error) {
 	launch := launcher.New().Context(ctx).Headless(headless)
+	bin, err := browserbin.Resolve(browserBin)
+	if err != nil {
+		return nil, err
+	}
+	if bin != "" {
+		launch = launch.Bin(bin)
+	}
 	chromiumProxyCfg, err := netproxy.ChromiumConfig(proxyCfg)
 	if err != nil {
 		return nil, fmt.Errorf("failed to build browser proxy config: %w", err)
