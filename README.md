@@ -257,9 +257,11 @@ func main() {
 1. 推荐给 `web_search` 和 `web_fetch` 传同一个 `netproxy.Config`
 2. 这样普通 HTTP 抓取和默认 `render=true` 都会复用同一套代理配置
 3. 如果只传 `HTTPClient` 而不传 `ProxyConfig`，默认浏览器渲染链路无法可靠推断代理
-4. 如果业务需要完全接管浏览器实现，仍可显式注入 `RenderFetcher` 或 `BrowserFetch`
+4. `webfetch.Config.BrowserBin` 可显式指定浏览器路径；未设置时由 `browserbin` 自动探测（Brave > Edge > Chrome > Chromium）
+5. Cloudflare 站点请通过 `CookieProvider` / `ChallengeHandler` 提供验证态；默认仍使用 Rod，不会切换到 Playwright
+6. 如果业务需要完全接管浏览器实现，仍可显式注入 `RenderFetcher` 或 `BrowserFetch`
 
-宿主若希望接管 `render=true` 的执行后端，可注入 `RenderFetcher`；未注入时工具会继续使用库内建的默认 render 实现。
+宿主若希望接管 `render=true` 的执行后端，可注入 `RenderFetcher`；未注入时工具会继续使用库内建的默认 Rod render 实现。
 
 `cmd/mcpserver` 会为 `web_search` 与 `web_fetch` 统一构造共享代理配置，并把它同时用于网络 `HTTPClient` 和默认 Rod 浏览器渲染链路。
 

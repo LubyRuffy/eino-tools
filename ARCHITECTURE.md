@@ -29,6 +29,14 @@
 
 当作为 package 被宿主直接调用时，推荐宿主通过 `netproxy.Config` 注入统一代理配置；若未显式传 `HTTPClient`，工具会自动据此构造共享 client。
 
+### browserbin
+
+公开包，解析 Chromium 系浏览器可执行文件路径，供 Rod 等浏览器链路复用：
+
+- 显式路径优先校验
+- 未设置时按 Brave > Edge > Chrome > Chromium 跨平台探测
+- 全部未命中返回空路径，由调用方回退 Rod 默认
+
 ### webfetch
 
 封装 HTTP 抓取、Readability 文本提取、可选渲染抓取与 Cloudflare 挑战回调。
@@ -39,10 +47,14 @@
 
 当作为 package 被宿主直接调用时，若宿主提供 `netproxy.Config`，普通 HTTP 抓取链路与默认 `render=true` 都会复用同一套代理配置；若只给了自定义 `HTTPClient`，默认浏览器渲染链路仍无法可靠推断代理。
 
+默认 `render=true` 通过 `browserbin.Resolve` 选择本机浏览器：`BrowserBin` 显式路径优先，否则自动探测；探测失败则不设 `Bin`，回退 Rod 默认。
+
 宿主可以只注入 `HTTPClient`，也可以额外注入：
 
 - `ProxyConfig`
   - 推荐的统一代理配置入口；可同时覆盖普通抓取与默认 `render=true`
+- `BrowserBin`
+  - 可选；显式指定 Chromium 系浏览器可执行文件。无效路径报错；空值走 `browserbin` 自动探测
 - `Cache`
 - `HeaderProvider`
 - `CookieProvider`

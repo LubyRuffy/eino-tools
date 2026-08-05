@@ -95,4 +95,7 @@
 - 通过 `websearch.Config.ProxyConfig` 与 `webfetch.Config.ProxyConfig` 注入
 - 这样普通 HTTP 抓取和默认 `render=true` 都会复用同一套代理配置
 - 若宿主必须自定义 `HTTPClient`，建议同时把同一份 `ProxyConfig` 也传给工具
+- 可通过 `webfetch.Config.BrowserBin` 显式指定浏览器可执行文件；未设置时由 `browserbin` 按 Brave > Edge > Chrome > Chromium 探测
+- 显式 `BrowserBin` 路径无效时 render 启动失败；自动探测全部未命中时回退 Rod 默认
 - 只有在宿主要完全接管浏览器实现时，才需要显式注入 `RenderFetcher` 或 `BrowserFetch`
+- Cloudflare 受保护站点仍应通过 `CookieProvider` / `ChallengeHandler` 提供验证态；换浏览器引擎不能替代 cookie / 人工验证语义
