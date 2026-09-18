@@ -2,6 +2,8 @@
 
 ## Added
 
+- 新增公开 `browserbin` package，按 Brave > Edge > Chrome > Chromium 解析本机 Chromium 系浏览器路径
+- `webfetch.Config.BrowserBin`：可选显式浏览器路径；未设置时默认 render 走 `browserbin` 自动探测，探测失败回退 Rod 默认
 - 初始化 `eino-tools` 仓库骨架与文档
 - 新增 `websearch`，封装 `web_search` Eino `tool.BaseTool`
 - 新增 `fetchurl`，封装 `fetch_url` 的 HTTP 抓取、Readability 提取与 render 回退

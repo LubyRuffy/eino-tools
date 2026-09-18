@@ -5,6 +5,8 @@ import (
 	"errors"
 	"net/http"
 	"net/http/httptest"
+	"os"
+	"path/filepath"
 	"sync/atomic"
 	"testing"
 
@@ -141,12 +143,27 @@ func TestTool_Fetch_RenderTrueUsesInjectedRenderFetcher(t *testing.T) {
 	assert.Equal(t, "# Injected Render\n\ncustom markdown", result)
 }
 
+func TestNewRodLauncher_AppliesBrowserBin(t *testing.T) {
+	dir := t.TempDir()
+	bin := filepath.Join(dir, "Brave Browser")
+	require.NoError(t, os.WriteFile(bin, []byte("x"), 0o755))
+
+	launch, err := newRodLauncher(context.Background(), true, netproxy.Config{}, bin)
+	require.NoError(t, err)
+	require.Equal(t, bin, launch.Get(flags.Bin))
+}
+
+func TestNewRodLauncher_InvalidBrowserBin_ReturnsError(t *testing.T) {
+	_, err := newRodLauncher(context.Background(), true, netproxy.Config{}, filepath.Join(t.TempDir(), "missing"))
+	require.Error(t, err)
+}
+
 func TestNewRodLauncher_AppliesProxyConfig(t *testing.T) {
 	launch, err := newRodLauncher(context.Background(), true, netproxy.Config{
 		HTTPProxy:  "http://proxy-http:8080",
 		HTTPSProxy: "http://proxy-https:8443",
 		NoProxy:    "localhost,.svc",
-	})
+	}, "")
 	require.NoError(t, err)
 	require.Equal(t, "http=http://proxy-http:8080;https=http://proxy-https:8443", launch.Get(flags.ProxyServer))
 

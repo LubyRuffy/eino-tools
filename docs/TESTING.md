@@ -8,6 +8,7 @@
 
 ```bash
 go test ./... -count=1
+go test ./browserbin -count=1
 go test ./netproxy -count=1
 go test ./websearch -count=1
 go test ./webfetch ./exec ./read ./write ./edit ./ls ./tree ./glob ./grep ./pythonrunner ./screenshot -count=1
@@ -26,7 +27,8 @@ go build ./cmd/mcpserver
 
 - `netproxy`：显式配置优先级、HTTP client 代理行为、Chromium 代理参数映射
 - `websearch`：空 query、缓存命中、工具名
-- `webfetch`：空 URL、默认请求头/cookie 注入、注入 HTML fetcher、默认 render 代理 launcher、Cloudflare fallback、challenge handler 回调重试
+- `browserbin`：显式路径存在/不存在、Brave 优先于 Chrome、探测未命中返回空、darwin/linux/windows 候选顺序
+- `webfetch`：空 URL、默认请求头/cookie 注入、注入 HTML fetcher、默认 render 代理 launcher、`BrowserBin` 注入与无效路径、Cloudflare fallback、challenge handler 回调重试
 - `exec`：正常执行、管道/换行保真、不跟随 `$SHELL`、不读 rc、`cwd` 相对 `base_dir` 解析且允许落在边界外、超时杀前台进程组但不误杀已返回的后台任务、受保护域名拦截
 - `read/write/edit/ls/tree/glob/grep`：路径解析允许落在 `base_dir` 边界外、基本文件操作和 patch/glob/grep 语义
 - `grep`：超长行不 abort、默认跳过 `dist` / `.worktrees` 等目录名、尊重 `.gitignore`、命中上限、显式 `path` 仍可搜 skip 目录本身
