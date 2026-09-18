@@ -44,7 +44,6 @@ func TestTool_InvokableRun_ResolvesCWDWithinBaseDir(t *testing.T) {
 
 	tl, err := New(Config{
 		DefaultBaseDir: baseDir,
-		AllowedPaths:   []string{"~/.codex", "~/.claude"},
 	})
 	require.NoError(t, err)
 
@@ -59,7 +58,6 @@ func TestTool_InvokableRun_AllowsCWDOutsideBaseDir(t *testing.T) {
 
 	tl, err := New(Config{
 		DefaultBaseDir: baseDir,
-		AllowedPaths:   []string{"~/.codex", "~/.claude"},
 	})
 	require.NoError(t, err)
 

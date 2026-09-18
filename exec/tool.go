@@ -42,7 +42,6 @@ type ChallengeHandler func(ctx context.Context, req ChallengeRequest) error
 
 type Config struct {
 	DefaultBaseDir         string
-	AllowedPaths           []string
 	ProtectedDomains       ProtectedDomains
 	ChallengeHandler       ChallengeHandler
 	ChallengeTimeoutMS     int
@@ -62,7 +61,6 @@ type Params struct {
 
 type Tool struct {
 	defaultBaseDir         string
-	allowedPaths           []string
 	protectedDomains       ProtectedDomains
 	challengeHandler       ChallengeHandler
 	challengeTimeoutMS     int
@@ -91,7 +89,6 @@ func New(cfg Config) (*Tool, error) {
 
 	return &Tool{
 		defaultBaseDir:         baseDir,
-		allowedPaths:           append([]string{}, cfg.AllowedPaths...),
 		protectedDomains:       cfg.ProtectedDomains,
 		challengeHandler:       cfg.ChallengeHandler,
 		challengeTimeoutMS:     timeoutMS,
@@ -215,7 +212,7 @@ func (t *Tool) Execute(ctx context.Context, params Params) (map[string]interface
 	}
 	workDir := baseDir
 	if strings.TrimSpace(params.CWD) != "" {
-		resolved, err := fsutil.ResolvePathWithin(baseDir, params.CWD, t.allowedPaths)
+		resolved, err := fsutil.ResolvePathWithin(baseDir, params.CWD)
 		if err != nil {
 			return nil, fmt.Errorf("invalid cwd: %w", err)
 		}
@@ -257,7 +254,7 @@ func (t *Tool) Execute(ctx context.Context, params Params) (map[string]interface
 		retryStdout, _ := retryPayload["stdout"].(string)
 		retryStderr, _ := retryPayload["stderr"].(string)
 		if _, stillBlocked := cloudflare.DetectFromCommandOutput(params.Command, retryStdout, retryStderr); stillBlocked {
-			return nil, fmt.Errorf("Cloudflare challenge still exists after manual verification, please retry with browser/web_fetch: %s", strings.TrimSpace(challengeURL))
+			return nil, fmt.Errorf("cloudflare challenge still exists after manual verification, please retry with browser/web_fetch: %s", strings.TrimSpace(challengeURL))
 		}
 		return retryPayload, nil
 	}

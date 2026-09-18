@@ -6,6 +6,7 @@
 
 - `websearch`：搜索工具
 - `webfetch`：当前命名的网页抓取与可读性提取工具
+- `browserbin`：跨平台解析 Chromium 系浏览器可执行文件路径
 - `exec`：当前命名的命令执行工具
 - `read` / `write` / `edit`：结构化文件读写工具
 - `ls` / `tree` / `glob` / `grep`：文件系统检索工具
@@ -73,10 +74,11 @@
 宿主可通过 `Config` 注入：
 
 - `DefaultBaseDir`
-- `AllowedPaths`
 - `ProtectedDomains`
 - `ChallengeHandler`
 - `ShellPath`（测试或明确覆盖时才需要；默认解析 bash）
+
+`base_dir` 仅作为相对路径解析锚点，解析后的路径不要求位于 `base_dir` 内；历史上 `Config` 的 `AllowedPaths` 字段已随路径限制一起移除。
 
 ### 文件与截图工具
 

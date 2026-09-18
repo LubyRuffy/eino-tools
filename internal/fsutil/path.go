@@ -29,7 +29,7 @@ func ResolveBaseDir(defaultBaseDir string, override string) (string, error) {
 	return abs, nil
 }
 
-func ResolvePathWithin(baseDir string, inputPath string, allowedPaths []string) (string, error) {
+func ResolvePathWithin(baseDir string, inputPath string) (string, error) {
 	if inputPath == "" {
 		return "", fmt.Errorf("path is required")
 	}

@@ -32,7 +32,7 @@ func TestResolvePathWithin_AllowsAbsolutePathOutsideBaseDir(t *testing.T) {
 	baseDir := t.TempDir()
 	outsidePath := filepath.Join(t.TempDir(), "random.txt")
 
-	pathValue, err := ResolvePathWithin(baseDir, outsidePath, nil)
+	pathValue, err := ResolvePathWithin(baseDir, outsidePath)
 	require.NoError(t, err)
 	assert.Equal(t, outsidePath, pathValue)
 }
@@ -42,7 +42,7 @@ func TestResolvePathWithin_AllowsRelativeTraversalOutsideBaseDir(t *testing.T) {
 	baseDir := filepath.Join(parentDir, "base")
 	require.NoError(t, os.MkdirAll(baseDir, 0o755))
 
-	pathValue, err := ResolvePathWithin(baseDir, "../target.txt", nil)
+	pathValue, err := ResolvePathWithin(baseDir, "../target.txt")
 	require.NoError(t, err)
 	assert.Equal(t, filepath.Join(parentDir, "target.txt"), pathValue)
 }

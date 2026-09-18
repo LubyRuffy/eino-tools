@@ -36,7 +36,6 @@ type LookPath func(string) (string, error)
 
 type Config struct {
 	DefaultBaseDir         string
-	AllowedPaths           []string
 	RuntimeGOOS            string
 	LookPath               LookPath
 	CommandBuilder         CommandBuilder
@@ -46,7 +45,6 @@ type Config struct {
 
 type Tool struct {
 	defaultBaseDir         string
-	allowedPaths           []string
 	runtimeGOOS            string
 	lookPath               LookPath
 	commandBuilder         CommandBuilder
@@ -69,7 +67,6 @@ func New(cfg Config) (*Tool, error) {
 	}
 	return &Tool{
 		defaultBaseDir:         cfg.DefaultBaseDir,
-		allowedPaths:           append([]string{}, cfg.AllowedPaths...),
 		runtimeGOOS:            goos,
 		lookPath:               lookPath,
 		commandBuilder:         cfg.CommandBuilder,
@@ -83,11 +80,11 @@ func (t *Tool) Info(ctx context.Context) (*schema.ToolInfo, error) {
 		Name: ToolName,
 		Desc: "Capture a screenshot and save it to a local image file.",
 		ParamsOneOf: schema.NewParamsOneOfByParams(map[string]*schema.ParameterInfo{
-			"output_path": {Type: schema.String, Desc: "Optional output image path. Relative to base_dir unless absolute."},
-			"region": {Type: schema.String, Desc: "Optional capture region in x,y,width,height format."},
+			"output_path":      {Type: schema.String, Desc: "Optional output image path. Relative to base_dir unless absolute."},
+			"region":           {Type: schema.String, Desc: "Optional capture region in x,y,width,height format."},
 			"include_data_url": {Type: schema.Boolean, Desc: "Optional: include base64 data URL in result (default false)."},
-			"timeout_ms": {Type: schema.Number, Desc: "Optional timeout in milliseconds."},
-			"base_dir": {Type: schema.String, Desc: "Base directory for resolving output path."},
+			"timeout_ms":       {Type: schema.Number, Desc: "Optional timeout in milliseconds."},
+			"base_dir":         {Type: schema.String, Desc: "Base directory for resolving output path."},
 		}),
 	}, nil
 }
@@ -112,7 +109,7 @@ func (t *Tool) InvokableRun(ctx context.Context, argumentsInJSON string, opts ..
 	if err != nil {
 		return "", err
 	}
-	absOutputPath, err := fsutil.ResolvePathWithin(baseDir, outputPath, t.allowedPaths)
+	absOutputPath, err := fsutil.ResolvePathWithin(baseDir, outputPath)
 	if err != nil {
 		return "", err
 	}

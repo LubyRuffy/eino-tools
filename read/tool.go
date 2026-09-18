@@ -22,20 +22,17 @@ const ToolName = "read"
 
 type Config struct {
 	DefaultBaseDir         string
-	AllowedPaths           []string
 	ShouldPassthroughError shared.ErrorPassthrough
 }
 
 type Tool struct {
 	defaultBaseDir         string
-	allowedPaths           []string
 	shouldPassthroughError shared.ErrorPassthrough
 }
 
 func New(cfg Config) (*Tool, error) {
 	return &Tool{
 		defaultBaseDir:         cfg.DefaultBaseDir,
-		allowedPaths:           append([]string{}, cfg.AllowedPaths...),
 		shouldPassthroughError: cfg.ShouldPassthroughError,
 	}, nil
 }
@@ -85,7 +82,7 @@ func (t *Tool) InvokableRun(ctx context.Context, argumentsInJSON string, opts ..
 	if filePath == "" {
 		return "", fmt.Errorf("file_path is required")
 	}
-	absPath, err := fsutil.ResolvePathWithin(baseDir, filePath, t.allowedPaths)
+	absPath, err := fsutil.ResolvePathWithin(baseDir, filePath)
 	if err != nil {
 		return "", err
 	}

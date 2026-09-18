@@ -30,10 +30,13 @@
 - `exec` 以及 `read`、`write`、`edit`、`ls`、`tree`、`glob`、`grep`、`screenshot` 的路径参数现仅把 `base_dir` 作为相对路径解析锚点，不再要求最终路径位于 `base_dir` 内
 - `exec` 默认改为非交互 bash（`--noprofile --norc -c`），不再跟随 `$SHELL`、不再 `source` 用户 rc；`timeout_ms` 只描述仍在运行的命令进程组
 - `grep` 仓库级搜索默认跳过构建/依赖/VCS 目录，尊重 `.gitignore`，并对不可读/超长/二进制文件跳过而不是整次失败；命中数量设上限
+- 各工具 `Config` 移除无效的 `AllowedPaths` 字段，`internal/fsutil.ResolvePathWithin` 移除 `allowedPaths` 参数（自路径限制放宽后即无实际作用）
+- `webfetch.Fetch` 缓存按模式严格隔离：`render=false` 不再命中此前 `render=true` 写入的缓存条目
 
 ## Fixed
 
 - `grep` 裸 `Walk` 撞上 `dist` / `.worktrees` 或超长行 `token too long` 时整次搜索失败
 - `exec` 在 macOS 上跟 `$SHELL` 走 zsh `eval`，特殊字符、无匹配 glob、多行 `python -c` 和刚拉起的后台任务不可用；并删除按命令字符串改超时的宿主特例
+- `internal/editutil` 遇到 `*** End of File` 时继续解析后续行，不再提前结束整个 patch
 
 - 删除兼容别名包 `fetchurl` 与 `bashcmd`，仓库对外只保留正式工具名

@@ -111,6 +111,28 @@ func TestTool_Fetch_CloudflareChallengeCallsBrowserFetchFallback(t *testing.T) {
 	assert.Equal(t, "browser fallback", result)
 }
 
+func TestTool_Fetch_NonRenderDoesNotReturnRenderCache(t *testing.T) {
+	cache := &fakeCache{values: map[string]string{}}
+	tl, err := New(Config{
+		HTMLFetcher: func(ctx context.Context, rawURL string) (string, error) {
+			return "plain html body", nil
+		},
+		RenderFetcher: func(ctx context.Context, rawURL string) (string, error) {
+			return "rendered markdown", nil
+		},
+		Cache: cache,
+	})
+	require.NoError(t, err)
+
+	rendered, err := tl.Fetch(context.Background(), "https://example.com/page", true)
+	require.NoError(t, err)
+	assert.Equal(t, "rendered markdown", rendered)
+
+	plain, err := tl.Fetch(context.Background(), "https://example.com/page", false)
+	require.NoError(t, err)
+	assert.Equal(t, "plain html body", plain, "non-render fetch must not reuse render-mode cache")
+}
+
 func TestTool_Fetch_UsesInjectedHTMLFetcher(t *testing.T) {
 	tl, err := New(Config{
 		HTMLFetcher: func(ctx context.Context, rawURL string) (string, error) {

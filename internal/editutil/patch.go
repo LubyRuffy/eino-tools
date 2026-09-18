@@ -79,7 +79,7 @@ func ParseApplyPatchText(patchText string, expectedDisplayPath string) ([]PatchR
 			continue
 		case strings.HasPrefix(line, "*** End Patch"):
 			flushHunk()
-			break
+			continue
 		case strings.HasPrefix(line, "*** Add File:"), strings.HasPrefix(line, "*** Delete File:"):
 			return nil, fmt.Errorf("patch operation not supported")
 		case strings.HasPrefix(line, "@@"):

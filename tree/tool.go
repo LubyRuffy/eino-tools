@@ -18,20 +18,17 @@ const ToolName = "tree"
 
 type Config struct {
 	DefaultBaseDir         string
-	AllowedPaths           []string
 	ShouldPassthroughError shared.ErrorPassthrough
 }
 
 type Tool struct {
 	defaultBaseDir         string
-	allowedPaths           []string
 	shouldPassthroughError shared.ErrorPassthrough
 }
 
 func New(cfg Config) (*Tool, error) {
 	return &Tool{
 		defaultBaseDir:         cfg.DefaultBaseDir,
-		allowedPaths:           append([]string{}, cfg.AllowedPaths...),
 		shouldPassthroughError: cfg.ShouldPassthroughError,
 	}, nil
 }
@@ -41,13 +38,13 @@ func (t *Tool) Info(ctx context.Context) (*schema.ToolInfo, error) {
 		Name: ToolName,
 		Desc: "Display a directory tree with depth control and filtering.",
 		ParamsOneOf: schema.NewParamsOneOfByParams(map[string]*schema.ParameterInfo{
-			"path": {Type: schema.String, Desc: "Directory path to display (relative to base_dir unless absolute).", Required: true},
-			"max_depth": {Type: schema.Number, Desc: "Max recursion depth (0 means only the root entry)."},
-			"include": {Type: schema.String, Desc: "Comma-separated glob patterns to include (match base name)."},
-			"exclude": {Type: schema.String, Desc: "Comma-separated glob patterns to exclude (match base name)."},
-			"only_dirs": {Type: schema.Boolean, Desc: "Only show directories."},
+			"path":        {Type: schema.String, Desc: "Directory path to display (relative to base_dir unless absolute).", Required: true},
+			"max_depth":   {Type: schema.Number, Desc: "Max recursion depth (0 means only the root entry)."},
+			"include":     {Type: schema.String, Desc: "Comma-separated glob patterns to include (match base name)."},
+			"exclude":     {Type: schema.String, Desc: "Comma-separated glob patterns to exclude (match base name)."},
+			"only_dirs":   {Type: schema.Boolean, Desc: "Only show directories."},
 			"max_entries": {Type: schema.Number, Desc: "Max number of entries to output."},
-			"base_dir": {Type: schema.String, Desc: "Base directory for resolving path-like parameters."},
+			"base_dir":    {Type: schema.String, Desc: "Base directory for resolving path-like parameters."},
 		}),
 	}, nil
 }
@@ -68,7 +65,7 @@ func (t *Tool) InvokableRun(ctx context.Context, argumentsInJSON string, opts ..
 	if pathValue == "" {
 		return "", fmt.Errorf("path is required")
 	}
-	root, err := fsutil.ResolvePathWithin(baseDir, pathValue, t.allowedPaths)
+	root, err := fsutil.ResolvePathWithin(baseDir, pathValue)
 	if err != nil {
 		return "", err
 	}

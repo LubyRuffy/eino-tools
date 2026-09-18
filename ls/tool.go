@@ -16,20 +16,17 @@ const ToolName = "ls"
 
 type Config struct {
 	DefaultBaseDir         string
-	AllowedPaths           []string
 	ShouldPassthroughError shared.ErrorPassthrough
 }
 
 type Tool struct {
 	defaultBaseDir         string
-	allowedPaths           []string
 	shouldPassthroughError shared.ErrorPassthrough
 }
 
 func New(cfg Config) (*Tool, error) {
 	return &Tool{
 		defaultBaseDir:         cfg.DefaultBaseDir,
-		allowedPaths:           append([]string{}, cfg.AllowedPaths...),
 		shouldPassthroughError: cfg.ShouldPassthroughError,
 	}, nil
 }
@@ -69,7 +66,7 @@ func (t *Tool) InvokableRun(ctx context.Context, argumentsInJSON string, opts ..
 	if pathValue == "" {
 		pathValue = "."
 	}
-	absPath, err := fsutil.ResolvePathWithin(baseDir, pathValue, t.allowedPaths)
+	absPath, err := fsutil.ResolvePathWithin(baseDir, pathValue)
 	if err != nil {
 		return "", err
 	}

@@ -186,17 +186,8 @@ func (t *Tool) Fetch(ctx context.Context, rawURL string, render bool) (string, e
 		cacheKey = renderCacheKey
 	}
 	if t.cache != nil {
-		if render {
-			if cached, ok, err := t.cache.Get(renderCacheKey); err == nil && ok {
-				return cached, nil
-			}
-		} else {
-			if cached, ok, err := t.cache.Get(renderCacheKey); err == nil && ok {
-				return cached, nil
-			}
-			if cached, ok, err := t.cache.Get(strings.TrimSpace(rawURL)); err == nil && ok {
-				return cached, nil
-			}
+		if cached, ok, err := t.cache.Get(cacheKey); err == nil && ok {
+			return cached, nil
 		}
 	}
 
@@ -226,7 +217,7 @@ func (t *Tool) Fetch(ctx context.Context, rawURL string, render bool) (string, e
 				result, err = t.executeFetch(ctx, rawURL, render)
 				if err != nil {
 					if _, stillChallenge := t.detectChallenge(err, rawURL); stillChallenge {
-						return "", fmt.Errorf("Cloudflare challenge still exists after manual verification, please retry manual verification")
+						return "", fmt.Errorf("cloudflare challenge still exists after manual verification, please retry manual verification")
 					}
 					return "", err
 				}
