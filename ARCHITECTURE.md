@@ -15,7 +15,7 @@
 - `internal/mcpserver`：Eino tools 到 MCP tools 的桥接、HTTP 端点挂载与 server 构造
 - `internal/shared`：参数解析、输出缓冲、工具错误处理
 - `internal/cloudflare`：Cloudflare 检测与保护域名状态
-- `internal/fsutil`：`base_dir`、白名单路径与显示路径处理
+- `internal/fsutil`：`base_dir`、路径解析、显示路径，以及仓库级 walk 的默认 skip / gitignore 策略
 - `internal/editutil`：apply-patch 文本解析与替换
 - `internal/screenshotutil`：截图路径、区域与 mime 处理
 
@@ -54,7 +54,9 @@
 
 ### exec
 
-封装 `/bin/bash -c` 执行、工作目录解析、输出截断、超时与 Cloudflare 保护域名拦截。
+封装非交互 bash 执行（`--noprofile --norc -c`，不跟随 `$SHELL`、不读 rc）、工作目录解析、输出截断、超时与 Cloudflare 保护域名拦截。
+
+超时只作用于仍在运行的命令进程组；shell 已经退出后留下的后台任务不会再被收割。`WaitDelay` 避免后台子进程占用 stdout/stderr 管道导致 `Wait` 一直挂到超时。超时数值只由 `timeout_ms` 决定，不按命令文本做特例。
 
 宿主可通过 `Config` 注入：
 
@@ -62,10 +64,13 @@
 - `AllowedPaths`
 - `ProtectedDomains`
 - `ChallengeHandler`
+- `ShellPath`（测试或明确覆盖时才需要；默认解析 bash）
 
 ### 文件与截图工具
 
 `read/write/edit/ls/tree/glob/grep/screenshot` 共享 `internal/fsutil`、`internal/editutil` 与 `internal/screenshotutil`，把相对路径解析、patch 解析和平台差异统一收敛到内部 helper。
+
+`grep` 的仓库级搜索会跳过 `.git` / `node_modules` / `.worktrees` / `dist` / `vendor` 这类目录名，尊重 `.gitignore`，并在超长行、二进制或不可读文件上跳过而不是让整次 Walk 失败。命中有上限。用户显式传入的搜索根（例如 `path=dist`）本身不会被默认 skip。
 
 ### MCP Server
 
