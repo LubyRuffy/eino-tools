@@ -93,6 +93,7 @@
 - 可通过 `exec.Config.ShellPath` 覆盖；覆盖后的 zsh 也使用 `-f`（不读 rc）
 - `timeout_ms` 只作用于仍在运行的命令进程组，默认 10000，上限 300000；不按命令文本改超时
 - shell 已经退出后，后台任务占用的 stdout/stderr 管道不会把这次调用拖到超时
+- `WithOutputListener(ctx, fn)` 在命令仍在运行时投递 stdout/stderr 分片；未设置则仍等 `Wait` 后一次性返回 JSON
 
 `grep`：
 

@@ -71,6 +71,8 @@
 
 超时只作用于仍在运行的命令进程组；shell 已经退出后留下的后台任务不会再被收割。`WaitDelay` 避免后台子进程占用 stdout/stderr 管道导致 `Wait` 一直挂到超时。超时数值只由 `timeout_ms` 决定，不按命令文本做特例。
 
+宿主可用 `WithOutputListener(ctx, fn)` 在 `Wait` 之前收到 stdout/stderr 分片。回调在进程的写路径上，不得久阻塞。每次回调拿到的是独立拷贝。未设置 listener 时行为与原来一致。
+
 宿主可通过 `Config` 注入：
 
 - `DefaultBaseDir`

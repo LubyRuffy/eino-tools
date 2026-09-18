@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"io"
 	"os"
 	osExec "os/exec"
 	"path/filepath"
@@ -311,6 +312,10 @@ func runCommandOnce(
 	stderrBuf := shared.NewLimitedBuffer(maxOutputBytes)
 	cmd.Stdout = stdoutBuf
 	cmd.Stderr = stderrBuf
+	if fn := outputListenerFrom(ctx); fn != nil {
+		cmd.Stdout = io.MultiWriter(stdoutBuf, liveWriter{stream: "stdout", fn: fn})
+		cmd.Stderr = io.MultiWriter(stderrBuf, liveWriter{stream: "stderr", fn: fn})
+	}
 	start := time.Now()
 
 	if err := cmd.Start(); err != nil {

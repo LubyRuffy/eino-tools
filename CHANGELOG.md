@@ -2,6 +2,7 @@
 
 ## Added
 
+- `exec.WithOutputListener`：命令运行期间按 chunk 回调 stdout/stderr，供宿主做实时显示；未设置时仍只在结束后返回完整 JSON
 - 新增公开 `browserbin` package，按 Brave > Edge > Chrome > Chromium 解析本机 Chromium 系浏览器路径
 - `webfetch.Config.BrowserBin`：可选显式浏览器路径；未设置时默认 render 走 `browserbin` 自动探测，探测失败回退 Rod 默认
 - 初始化 `eino-tools` 仓库骨架与文档
