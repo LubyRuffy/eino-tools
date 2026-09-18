@@ -85,6 +85,22 @@
 
 这些变量同样只影响 `web_search` 与 `web_fetch`。
 
+## `exec` / `grep` 行为
+
+`exec`：
+
+- 默认使用非交互 bash（`--noprofile --norc -c`），不跟随环境变量 `$SHELL`，不 `source` 用户 rc
+- 可通过 `exec.Config.ShellPath` 覆盖；覆盖后的 zsh 也使用 `-f`（不读 rc）
+- `timeout_ms` 只作用于仍在运行的命令进程组，默认 10000，上限 300000；不按命令文本改超时
+- shell 已经退出后，后台任务占用的 stdout/stderr 管道不会把这次调用拖到超时
+
+`grep`：
+
+- 仓库级搜索默认跳过目录名 `.git`、`node_modules`、`.worktrees`、`dist`、`vendor`
+- 额外尊重 git 根和搜索根的 `.gitignore`
+- 显式传入的 `path` 本身不会被默认 skip，因此可以搜 `dist/`
+- 不可读、二进制、超长行文件会跳过，而不是让整次搜索失败
+
 ## 作为 Go Package 使用
 
 `docs/CONFIG.md` 上面的配置项只适用于 `cmd/mcpserver`。

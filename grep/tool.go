@@ -2,6 +2,7 @@ package grep
 
 import (
 	"bufio"
+	"bytes"
 	"context"
 	"fmt"
 	"os"
@@ -16,7 +17,14 @@ import (
 	"github.com/cloudwego/eino/schema"
 )
 
-const ToolName = "grep"
+const (
+	ToolName          = "grep"
+	DefaultMaxMatches = 200
+	TruncatedSuffix   = "[truncated]"
+	maxScanTokenSize  = 1 << 20
+	maxGrepFileBytes  = 8 << 20
+	maxReportedLine   = 4096
+)
 
 type Config struct {
 	DefaultBaseDir         string
@@ -47,13 +55,13 @@ func New(cfg Config) (*Tool, error) {
 func (t *Tool) Info(ctx context.Context) (*schema.ToolInfo, error) {
 	return &schema.ToolInfo{
 		Name: ToolName,
-		Desc: "Search for a pattern in files.",
+		Desc: "Search for a pattern in files. Skips VCS/dependency/build directories, gitignored paths, binaries, and unreadable or overlong files instead of failing the whole search.",
 		ParamsOneOf: schema.NewParamsOneOfByParams(map[string]*schema.ParameterInfo{
-			"pattern": {Type: schema.String, Desc: "Regular expression pattern to search for.", Required: true},
-			"path": {Type: schema.String, Desc: "Base directory path (relative to base_dir unless absolute)."},
-			"glob": {Type: schema.String, Desc: "Glob pattern to filter files."},
+			"pattern":     {Type: schema.String, Desc: "Regular expression pattern to search for.", Required: true},
+			"path":        {Type: schema.String, Desc: "Base directory path (relative to base_dir unless absolute)."},
+			"glob":        {Type: schema.String, Desc: "Glob pattern to filter files."},
 			"output_mode": {Type: schema.String, Desc: "Output mode: files_with_matches, content, or count."},
-			"base_dir": {Type: schema.String, Desc: "Base directory for resolving path-like parameters."},
+			"base_dir":    {Type: schema.String, Desc: "Base directory for resolving path-like parameters."},
 		}),
 	}, nil
 }
@@ -99,59 +107,97 @@ func (t *Tool) InvokableRun(ctx context.Context, argumentsInJSON string, opts ..
 		outputMode = "files_with_matches"
 	}
 
+	ignore := fsutil.LoadWalkIgnore(absBasePath)
 	var matches []grepMatch
+	truncated := false
+	limitReached := func() bool {
+		if outputMode == "count" {
+			return false
+		}
+		if outputMode == "content" {
+			return len(matches) >= DefaultMaxMatches
+		}
+		seen := make(map[string]struct{})
+		for _, match := range matches {
+			seen[match.Path] = struct{}{}
+		}
+		return len(seen) >= DefaultMaxMatches
+	}
+
+	collect := func(path string) {
+		if path != absBasePath && ignore.SkipFile(path) {
+			return
+		}
+		matches = append(matches, t.searchFile(path, re)...)
+	}
+
 	if info.IsDir() {
 		if globPattern != "" {
-			files, err := filepath.Glob(filepath.Join(absBasePath, globPattern))
-			if err != nil {
-				return "", fmt.Errorf("invalid glob pattern: %w", err)
+			files, globErr := filepath.Glob(filepath.Join(absBasePath, globPattern))
+			if globErr != nil {
+				return "", fmt.Errorf("invalid glob pattern: %w", globErr)
 			}
 			for _, file := range files {
-				fileInfo, err := os.Stat(file)
-				if err != nil || fileInfo.IsDir() {
+				fileInfo, statErr := os.Stat(file)
+				if statErr != nil || fileInfo.IsDir() {
 					continue
 				}
-				fileMatches, err := t.searchFile(file, re)
-				if err != nil {
-					return "", err
+				collect(file)
+				if limitReached() {
+					truncated = true
+					break
 				}
-				matches = append(matches, fileMatches...)
 			}
 		} else {
-			err = filepath.Walk(absBasePath, func(path string, info os.FileInfo, err error) error {
-				if err != nil {
-					return err
+			walkErr := filepath.Walk(absBasePath, func(path string, info os.FileInfo, walkErr error) error {
+				if walkErr != nil {
+					return nil
 				}
-				if !info.IsDir() {
-					fileMatches, err := t.searchFile(path, re)
-					if err != nil {
-						return err
+				if info.IsDir() {
+					if ignore.SkipDir(path, info.Name()) {
+						return filepath.SkipDir
 					}
-					matches = append(matches, fileMatches...)
+					return nil
+				}
+				collect(path)
+				if limitReached() {
+					truncated = true
+					return filepath.SkipAll
 				}
 				return nil
 			})
-			if err != nil {
-				return "", fmt.Errorf("failed to walk directory: %w", err)
+			if walkErr != nil {
+				return "", fmt.Errorf("failed to walk directory: %w", walkErr)
 			}
 		}
 	} else {
-		fileMatches, err := t.searchFile(absBasePath, re)
-		if err != nil {
-			return "", err
-		}
-		matches = append(matches, fileMatches...)
+		collect(absBasePath)
 	}
 
+	return formatGrepMatches(baseDir, outputMode, matches, truncated), nil
+}
+
+func formatGrepMatches(baseDir, outputMode string, matches []grepMatch, truncated bool) string {
 	switch outputMode {
 	case "count":
-		return strconv.Itoa(len(matches)), nil
+		return strconv.Itoa(len(matches))
 	case "content":
+		if len(matches) > DefaultMaxMatches {
+			matches = matches[:DefaultMaxMatches]
+			truncated = true
+		}
 		var out strings.Builder
 		for _, match := range matches {
-			out.WriteString(fmt.Sprintf("%s:%d:%s\n", fsutil.DisplayPath(baseDir, match.Path), match.Line, match.Content))
+			content := match.Content
+			if len(content) > maxReportedLine {
+				content = content[:maxReportedLine] + "…"
+			}
+			out.WriteString(fmt.Sprintf("%s:%d:%s\n", fsutil.DisplayPath(baseDir, match.Path), match.Line, content))
 		}
-		return out.String(), nil
+		if truncated {
+			out.WriteString(TruncatedSuffix + "\n")
+		}
+		return out.String()
 	default:
 		seen := make(map[string]struct{})
 		files := make([]string, 0)
@@ -159,22 +205,52 @@ func (t *Tool) InvokableRun(ctx context.Context, argumentsInJSON string, opts ..
 			if _, ok := seen[match.Path]; ok {
 				continue
 			}
+			if len(files) >= DefaultMaxMatches {
+				truncated = true
+				break
+			}
 			files = append(files, fsutil.DisplayPath(baseDir, match.Path))
 			seen[match.Path] = struct{}{}
 		}
-		return strings.Join(files, "\n"), nil
+		out := strings.Join(files, "\n")
+		if truncated {
+			if out != "" {
+				out += "\n"
+			}
+			out += TruncatedSuffix
+		}
+		return out
 	}
 }
 
-func (t *Tool) searchFile(filePath string, re *regexp.Regexp) ([]grepMatch, error) {
+func (t *Tool) searchFile(filePath string, re *regexp.Regexp) []grepMatch {
+	info, err := os.Stat(filePath)
+	if err != nil || info.IsDir() || info.Size() > maxGrepFileBytes {
+		return nil
+	}
 	file, err := os.Open(filePath)
 	if err != nil {
-		return nil, fmt.Errorf("failed to open file %s: %w", filePath, err)
+		return nil
 	}
 	defer file.Close()
 
-	var matches []grepMatch
+	head := make([]byte, 8000)
+	n, _ := file.Read(head)
+	if n > 0 {
+		head = head[:n]
+	} else {
+		head = nil
+	}
+	if bytes.IndexByte(head, 0) >= 0 {
+		return nil
+	}
+	if _, err := file.Seek(0, 0); err != nil {
+		return nil
+	}
+
 	scanner := bufio.NewScanner(file)
+	scanner.Buffer(make([]byte, 64*1024), maxScanTokenSize)
+	var matches []grepMatch
 	lineNum := 1
 	for scanner.Scan() {
 		line := scanner.Text()
@@ -183,8 +259,8 @@ func (t *Tool) searchFile(filePath string, re *regexp.Regexp) ([]grepMatch, erro
 		}
 		lineNum++
 	}
-	if err := scanner.Err(); err != nil {
-		return nil, fmt.Errorf("failed to read file %s: %w", filePath, err)
+	if scanner.Err() != nil {
+		return nil
 	}
-	return matches, nil
+	return matches
 }

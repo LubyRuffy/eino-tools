@@ -3,11 +3,11 @@ package exec
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"os"
 	osExec "os/exec"
 	"path/filepath"
-	"strconv"
 	"strings"
 	"syscall"
 	"time"
@@ -19,7 +19,13 @@ import (
 	"github.com/cloudwego/eino/schema"
 )
 
-const ToolName = "exec"
+const (
+	ToolName                = "exec"
+	defaultCommandTimeoutMS = 10000
+	maxCommandTimeoutMS     = 300000
+)
+
+var bashLookPath = osExec.LookPath
 
 type ProtectedDomains interface {
 	Mark(input string)
@@ -97,7 +103,7 @@ func New(cfg Config) (*Tool, error) {
 func (t *Tool) Info(ctx context.Context) (*schema.ToolInfo, error) {
 	return &schema.ToolInfo{
 		Name: ToolName,
-		Desc: "Execute bash commands directly in the current environment. Supports pipes, redirects, and chained commands.",
+		Desc: "Execute bash commands with a non-interactive bash (no rc files, not $SHELL). Supports pipes, redirects, and chained commands.",
 		ParamsOneOf: schema.NewParamsOneOfByParams(map[string]*schema.ParameterInfo{
 			"command": {
 				Type:     schema.String,
@@ -116,7 +122,7 @@ func (t *Tool) Info(ctx context.Context) (*schema.ToolInfo, error) {
 			},
 			"timeout_ms": {
 				Type:     schema.Number,
-				Desc:     "Timeout in milliseconds.",
+				Desc:     "Timeout in milliseconds for the still-running command process group. Default 10000. Background jobs already reparented after the shell exits are not reaped.",
 				Required: false,
 			},
 			"max_output_kb": {
@@ -193,17 +199,7 @@ func (t *Tool) Execute(ctx context.Context, params Params) (map[string]interface
 		)
 	}
 
-	timeoutDefault := 10000
-	if params.TimeoutMS == 0 && strings.Contains(params.Command, "plugins/fofa/scripts/run_fofa_playground.sh") {
-		timeoutDefault = 60000
-	}
-	timeoutMS := params.TimeoutMS
-	if timeoutMS <= 0 {
-		timeoutMS = timeoutDefault
-	}
-	if timeoutMS > 300000 {
-		timeoutMS = 300000
-	}
+	timeoutMS := resolveCommandTimeoutMS(params.TimeoutMS)
 
 	maxOutputKB := params.MaxOutputKB
 	if maxOutputKB <= 0 {
@@ -297,6 +293,11 @@ func runCommandOnce(
 	cmd := osExec.CommandContext(ctx, execPath, execArgs...)
 	cmd.Dir = workDir
 	cmd.SysProcAttr = &syscall.SysProcAttr{Setpgid: true}
+	// Background children inherit the stdout/stderr pipes. Without WaitDelay,
+	// cmd.Wait blocks until those children close the pipes (or until timeout
+	// kills the whole process group). WaitDelay lets the shell exit while
+	// detached jobs keep running.
+	cmd.WaitDelay = 200 * time.Millisecond
 
 	if stdinValue != "" {
 		cmd.Stdin = strings.NewReader(stdinValue)
@@ -347,7 +348,11 @@ func runCommandOnce(
 	elapsedMS := time.Since(start).Milliseconds()
 	exitCode := 0
 	if runErr != nil {
-		if exitErr, ok := runErr.(*osExec.ExitError); ok {
+		if errors.Is(runErr, osExec.ErrWaitDelay) && cmd.ProcessState != nil {
+			// Shell already exited; leftover pipe holders are background children.
+			exitCode = cmd.ProcessState.ExitCode()
+			runErr = nil
+		} else if exitErr, ok := runErr.(*osExec.ExitError); ok {
 			exitCode = exitErr.ExitCode()
 		} else {
 			exitCode = -1
@@ -377,11 +382,20 @@ func runCommandOnce(
 }
 
 func resolveShellPath() (string, error) {
-	shellPath := strings.TrimSpace(os.Getenv("SHELL"))
-	if shellPath != "" {
-		return shellPath, nil
+	if path, err := bashLookPath("bash"); err == nil && strings.TrimSpace(path) != "" {
+		return path, nil
 	}
 	return "/bin/bash", nil
+}
+
+func resolveCommandTimeoutMS(timeoutMS int) int {
+	if timeoutMS <= 0 {
+		timeoutMS = defaultCommandTimeoutMS
+	}
+	if timeoutMS > maxCommandTimeoutMS {
+		timeoutMS = maxCommandTimeoutMS
+	}
+	return timeoutMS
 }
 
 func buildShellInvocation(shellPath string, command string) (string, []string) {
@@ -390,20 +404,14 @@ func buildShellInvocation(shellPath string, command string) (string, []string) {
 		shellPath = "/bin/bash"
 	}
 
-	if strings.EqualFold(filepath.Base(shellPath), "zsh") || strings.EqualFold(filepath.Base(shellPath), "zsh.exe") {
-		home, _ := os.UserHomeDir()
-		if home == "" {
-			home = os.Getenv("HOME")
-		}
-		if home != "" {
-			zshrcPath := filepath.Join(home, ".zshrc")
-			if _, err := os.Stat(zshrcPath); err == nil {
-				return shellPath, []string{"-lc", "source " + strconv.Quote(zshrcPath) + "; eval " + strconv.Quote(command)}
-			}
-		}
+	switch strings.ToLower(filepath.Base(shellPath)) {
+	case "bash", "bash.exe":
+		return shellPath, []string{"--noprofile", "--norc", "-c", command}
+	case "zsh", "zsh.exe":
+		return shellPath, []string{"-f", "-c", command}
+	default:
+		return shellPath, []string{"-c", command}
 	}
-
-	return shellPath, []string{"-lc", command}
 }
 
 func isLikelyDirectHTTPCommand(command string) bool {
