@@ -41,3 +41,11 @@ go build ./cmd/mcpserver
 - 排查路径：用 `4095` 个 ASCII + CJK 构造切点；对 `0xE9`/`0xFF` 等非中文页字节打印 `transform.Bytes` 的 error（通常是 nil）。
 - 修复要点：先按 `utf8.FullRune` 允许末尾截断再判 UTF-8；GB18030 必须解码且无替换符，必要时丢 1–3 个尾字节；UTF-8 BOM 读取时 skip 3 字节；给 InvokableRun 用新的 decoder，不要复用探测时已经跑过的 transformer。
 - 验证方式：`go test ./read -count=1 -race`
+
+## 经验教训：Issue #5
+
+- 现象：`edit` 缺 `search_block` 或空 `replace_block` 都报同一句 `either search_block/replace_block or patch is required`。
+- 根因：模式开关用两个非空字符串 AND；`GetStringParam` 对非 string 静默变 `""`；默认 `ToolInvokableDefer` 把 error 塞进返回字符串，测试若断言 `err != nil` 会假绿/假红。
+- 排查路径：用 `json.Marshal` 区分 omitted 与 `""`；不要改 `GetStringParam` 的静默行为。
+- 修复要点：新增 `LookupStringParam`；按键是否存在分流；空 replace 走删除；类型错误点名字段；缺载荷列出收到的键；search/replace 优先于 patch。
+- 验证方式：`go test ./edit ./internal/shared -count=1 -race`

@@ -88,6 +88,8 @@
 
 `read` 用文件前 4096 字节探测编码：样本允许末尾被窗口截断的 UTF-8，合法 UTF-8（含 BOM，读取时跳过 BOM 字节）输出 `encoding=utf-8`；裁尾后仍非法 UTF-8 才尝试 GB18030，且解码结果不得含替换符；否则回退 `iso-8859-1`。探测结论用于整文件解码，不会把合法 UTF-8 再交给 GB18030。
 
+`edit` 只有两种模式：`search_block` 与 `replace_block` 必须成对出现（`replace_block` 为空串表示删除），或提供 `patch`。两者都给时 search/replace 优先。缺字段、类型不是 string、search 找不到，错误文案可区分，并会列出实际收到的键。
+
 `grep` 的仓库级搜索会跳过 `.git` / `node_modules` / `.worktrees` / `dist` / `vendor` 这类目录名，尊重 `.gitignore`，并在超长行、二进制或不可读文件上跳过而不是让整次 Walk 失败。命中有上限。用户显式传入的搜索根（例如 `path=dist`）本身不会被默认 skip。
 
 ### MCP Server
