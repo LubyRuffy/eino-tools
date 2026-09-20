@@ -33,3 +33,11 @@ go build ./cmd/mcpserver
 - 排查路径：先在干净 worktree 用失败测试复现，不要拿主工作区未提交的 `eval "$1"` 当修复。
 - 修复要点：walk skip 用目录名 + gitignore 通用策略；exec 固定非交互 bash；`WaitDelay` + `ErrWaitDelay` 表示 shell 已退出；超时只看 `timeout_ms`，禁止 `strings.Contains(command)` 特例。
 - 验证方式：`go test ./grep ./exec ./internal/fsutil -count=1`
+
+## 经验教训：Issue #4
+
+- 现象：`read` 把无 BOM 的合法 UTF-8 中文标成 `encoding=gb18030`，正文是误解码乱码。
+- 根因：4096 字节样本切在多字节 rune 中间导致 `utf8.Valid` 失败；`golang.org/x/text` 的 GB18030 decoder 几乎不返回 error，用 U+FFFD 吞非法字节，`transform.Bytes` 成功就被当成 GB18030。
+- 排查路径：用 `4095` 个 ASCII + CJK 构造切点；对 `0xE9`/`0xFF` 等非中文页字节打印 `transform.Bytes` 的 error（通常是 nil）。
+- 修复要点：先按 `utf8.FullRune` 允许末尾截断再判 UTF-8；GB18030 必须解码且无替换符，必要时丢 1–3 个尾字节；UTF-8 BOM 读取时 skip 3 字节；给 InvokableRun 用新的 decoder，不要复用探测时已经跑过的 transformer。
+- 验证方式：`go test ./read -count=1 -race`

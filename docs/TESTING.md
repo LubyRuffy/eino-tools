@@ -31,6 +31,7 @@ go build ./cmd/mcpserver
 - `webfetch`：空 URL、默认请求头/cookie 注入、注入 HTML fetcher、默认 render 代理 launcher、`BrowserBin` 注入与无效路径、render/plain 缓存隔离、Cloudflare fallback、challenge handler 回调重试
 - `exec`：正常执行、管道/换行保真、不跟随 `$SHELL`、不读 rc、`cwd` 相对 `base_dir` 解析且允许落在边界外、超时杀前台进程组但不误杀已返回的后台任务、受保护域名拦截、`WithOutputListener` 在 `Wait` 前收到 stdout/stderr 分片
 - `read/write/edit/ls/tree/glob/grep`：路径解析允许落在 `base_dir` 边界外、基本文件操作和 patch/glob/grep 语义；`Config.AllowedPaths` / `ResolvePathWithin` 第三参已移除
+- `read`：编码探测覆盖 UTF-8 窗口截断、无 BOM 短 CJK、UTF-8 BOM 不进正文、真 GB18030（含窗口切在多字节中间）、非中文页回退 iso-8859-1、ASCII / 空文件；工具描述不含测试夹具词
 - `grep`：超长行不 abort、默认跳过 `dist` / `.worktrees` 等目录名、尊重 `.gitignore`、命中上限、显式 `path` 仍可搜 skip 目录本身
 - `internal/fsutil`：walk skip 目录名精确匹配、gitignore 否定规则、显式搜索根不 skip
 - `pythonrunner`：空代码、requirements、执行结果结构
