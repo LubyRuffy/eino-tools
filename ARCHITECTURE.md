@@ -86,6 +86,8 @@
 
 `read/write/edit/ls/tree/glob/grep/screenshot` 共享 `internal/fsutil`、`internal/editutil` 与 `internal/screenshotutil`，把相对路径解析、patch 解析和平台差异统一收敛到内部 helper。
 
+`read` 用文件前 4096 字节探测编码：样本允许末尾被窗口截断的 UTF-8，合法 UTF-8（含 BOM，读取时跳过 BOM 字节）输出 `encoding=utf-8`；裁尾后仍非法 UTF-8 才尝试 GB18030，且解码结果不得含替换符；否则回退 `iso-8859-1`。探测结论用于整文件解码，不会把合法 UTF-8 再交给 GB18030。
+
 `grep` 的仓库级搜索会跳过 `.git` / `node_modules` / `.worktrees` / `dist` / `vendor` 这类目录名，尊重 `.gitignore`，并在超长行、二进制或不可读文件上跳过而不是让整次 Walk 失败。命中有上限。用户显式传入的搜索根（例如 `path=dist`）本身不会被默认 skip。
 
 ### MCP Server

@@ -50,7 +50,7 @@ _ = execTool
 
 `base_dir` 现在统一只作为相对路径解析锚点使用；`exec` 和文件读写类工具都允许最终路径落在 `base_dir` 之外。
 
-`exec` 跑的是非交互 bash，不读用户 rc，也不跟 `$SHELL`。需要边跑边看输出时，把 `WithOutputListener` 挂到 `Execute`/`InvokableRun` 的 ctx 上。`grep` 默认跳过构建/依赖/VCS 目录和 gitignore，不会被一份超长打包文件整死。
+`exec` 跑的是非交互 bash，不读用户 rc，也不跟 `$SHELL`。需要边跑边看输出时，把 `WithOutputListener` 挂到 `Execute`/`InvokableRun` 的 ctx 上。`grep` 默认跳过构建/依赖/VCS 目录和 gitignore，不会被一份超长打包文件整死。`read` 按前 4096 字节探测编码：窗口切在 UTF-8 多字节中间仍判 `utf-8`，真 GB18030 才标 `gb18030`，UTF-8 BOM 不进正文。
 
 如果需要统一配置网络代理，推荐同时引入 `netproxy`：
 

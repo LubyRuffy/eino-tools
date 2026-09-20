@@ -7,14 +7,11 @@ import (
 	"fmt"
 	"io"
 	"os"
-	"unicode/utf8"
 
 	"github.com/LubyRuffy/eino-tools/internal/fsutil"
 	"github.com/LubyRuffy/eino-tools/internal/shared"
 	"github.com/cloudwego/eino/components/tool"
 	"github.com/cloudwego/eino/schema"
-	"golang.org/x/text/encoding/charmap"
-	"golang.org/x/text/encoding/simplifiedchinese"
 	"golang.org/x/text/transform"
 )
 
@@ -105,11 +102,16 @@ func (t *Tool) InvokableRun(ctx context.Context, argumentsInJSON string, opts ..
 	sample := make([]byte, 4096)
 	n, _ := f.Read(sample)
 	sample = sample[:n]
-	if _, err := f.Seek(0, io.SeekStart); err != nil {
+
+	encodingName, decoder := detectTextDecoder(sample)
+	skip := int64(0)
+	if encodingName == "utf-8" {
+		skip = int64(utf8BOMLen(sample))
+	}
+	if _, err := f.Seek(skip, io.SeekStart); err != nil {
 		return "", fmt.Errorf("failed to seek file: %w", err)
 	}
 
-	encodingName, decoder := detectTextDecoder(sample)
 	var reader io.Reader = f
 	if decoder != nil {
 		reader = transform.NewReader(f, decoder)
@@ -152,22 +154,4 @@ func (t *Tool) InvokableRun(ctx context.Context, argumentsInJSON string, opts ..
 
 	header := fmt.Sprintf("encoding=%s path=%s offset=%d limit=%d\n", encodingName, filePath, offset, limit)
 	return header + out.String(), nil
-}
-
-func detectTextDecoder(sample []byte) (string, transform.Transformer) {
-	if len(sample) >= 3 && sample[0] == 0xEF && sample[1] == 0xBB && sample[2] == 0xBF {
-		return "utf-8", nil
-	}
-	if utf8.Valid(sample) {
-		return "utf-8", nil
-	}
-
-	gb := simplifiedchinese.GB18030.NewDecoder()
-	decoded, _, err := transform.Bytes(gb, sample)
-	if err == nil && utf8.Valid(decoded) {
-		return "gb18030", gb
-	}
-
-	latin := charmap.ISO8859_1.NewDecoder()
-	return "iso-8859-1", latin
 }
