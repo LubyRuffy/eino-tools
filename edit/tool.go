@@ -35,7 +35,7 @@ func New(cfg Config) (*Tool, error) {
 func (t *Tool) Info(ctx context.Context) (*schema.ToolInfo, error) {
 	return &schema.ToolInfo{
 		Name: ToolName,
-		Desc: "Edit a file by search/replace blocks or apply patch hunks. Simple interface without confirmation.",
+		Desc: "Edit a file in one of two modes. Mode A: search_block and replace_block must appear together; replace_block may be an empty string to delete the matched text. Mode B: patch is apply_patch text. If both modes are provided, search_block/replace_block takes precedence and patch is ignored.",
 		ParamsOneOf: schema.NewParamsOneOfByParams(map[string]*schema.ParameterInfo{
 			"file_path": {
 				Type:     schema.String,
@@ -44,17 +44,17 @@ func (t *Tool) Info(ctx context.Context) (*schema.ToolInfo, error) {
 			},
 			"search_block": {
 				Type:     schema.String,
-				Desc:     "Exact text block to find in the file (use original newlines).",
+				Desc:     "Exact text to find. Must be paired with replace_block. Use original newlines.",
 				Required: false,
 			},
 			"replace_block": {
 				Type:     schema.String,
-				Desc:     "Replacement text block (use desired newlines).",
+				Desc:     "Replacement text paired with search_block. Empty string deletes the matched search_block. Omitted is not the same as empty.",
 				Required: false,
 			},
 			"patch": {
 				Type:     schema.String,
-				Desc:     "apply_patch-style text (*** Begin Patch / *** Update File / @@ / +/- lines / *** End Patch).",
+				Desc:     "apply_patch-style text for mode B (*** Begin Patch / *** Update File / @@ / +/- lines / *** End Patch). Ignored when search_block and replace_block are both provided.",
 				Required: false,
 			},
 			"base_dir": {
@@ -92,17 +92,14 @@ func (t *Tool) InvokableRun(ctx context.Context, argumentsInJSON string, opts ..
 		return "", fmt.Errorf("failed to read file: %w", err)
 	}
 
-	searchBlock := shared.GetStringParam(params, "search_block")
-	replaceBlock := shared.GetStringParam(params, "replace_block")
-	patchText := shared.GetStringParam(params, "patch")
-
-	if searchBlock != "" && replaceBlock != "" {
-		return t.applySearchReplace(absPath, displayPath, string(oldBytes), searchBlock, replaceBlock)
+	payload, err := resolveEditPayload(params)
+	if err != nil {
+		return "", err
 	}
-	if patchText != "" {
-		return t.applyPatch(absPath, displayPath, string(oldBytes), patchText)
+	if payload.useSearch {
+		return t.applySearchReplace(absPath, displayPath, string(oldBytes), payload.search, payload.replace)
 	}
-	return "", fmt.Errorf("either search_block/replace_block or patch is required")
+	return t.applyPatch(absPath, displayPath, string(oldBytes), payload.patch)
 }
 
 func (t *Tool) applySearchReplace(absPath, displayPath, oldContent, searchBlock, replaceBlock string) (string, error) {

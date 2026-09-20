@@ -59,3 +59,20 @@ func GetIntParam(params map[string]interface{}, key string, defaultValue int) in
 	}
 	return defaultValue
 }
+
+// LookupStringParam 区分 omitted / 空串 / 类型错误。
+// GetStringParam 对非 string 仍静默变空，别的工具还在吃这套老行为。
+func LookupStringParam(params map[string]interface{}, key string) (value string, present bool, err error) {
+	if params == nil {
+		return "", false, nil
+	}
+	raw, ok := params[key]
+	if !ok || raw == nil {
+		return "", false, nil
+	}
+	text, ok := raw.(string)
+	if !ok {
+		return "", true, fmt.Errorf("%s must be a string", key)
+	}
+	return text, true, nil
+}

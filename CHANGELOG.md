@@ -36,6 +36,7 @@
 
 ## Fixed
 
+- `edit` 把 search/replace 都标成可选，缺一个字段或空 replace 就甩同一句 `either...required`；现按键是否存在区分 omitted 与空串，空 replace 表示删除，非 string 报类型错误，缺载荷会列出实际收到的键；search/replace 与 patch 同时给时 search/replace 优先
 - `read` 把 4096 字节探测窗口切在多字节中间的合法 UTF-8 误判成 GB18030，正文变成乱码；现先裁不完整 UTF-8 尾再判定，真 GB18030 仍可检出，其余回退 iso-8859-1，UTF-8 BOM 不再进入正文
 - `grep` 裸 `Walk` 撞上 `dist` / `.worktrees` 或超长行 `token too long` 时整次搜索失败
 - `exec` 在 macOS 上跟 `$SHELL` 走 zsh `eval`，特殊字符、无匹配 glob、多行 `python -c` 和刚拉起的后台任务不可用；并删除按命令字符串改超时的宿主特例
