@@ -49,3 +49,11 @@ go build ./cmd/mcpserver
 - 排查路径：用 `json.Marshal` 区分 omitted 与 `""`；不要改 `GetStringParam` 的静默行为。
 - 修复要点：新增 `LookupStringParam`；按键是否存在分流；空 replace 走删除；类型错误点名字段；缺载荷列出收到的键；search/replace 优先于 patch。
 - 验证方式：`go test ./edit ./internal/shared -count=1 -race`
+
+## 经验教训：Issue #8
+
+- 现象：`write` 返回 `Updated file` 后，盘上没有调用方声称写入的内容。
+- 根因：`GetStringParam` 把缺字段、错类型、`contents` 这类近似键都吃成空串；成功句不回读、只用调用方传入的相对路径。
+- 排查路径：用 `json.Marshal` 区分 omitted 与 `""`；断言看返回字符串里的 `error:`，不要只看 `err != nil`。`file_path` 错误文案里的 `path` 子串会让近似键断言假绿。
+- 修复要点：`LookupStringParam` 分流 omitted / 空串 / 类型错误；缺参列出收到的键并提示近似键；`WriteFile` 后 `ReadFile` 比对字节，对不上不准报成功；成功句带解析后路径和字节数。不要改 `GetStringParam` 的静默行为。
+- 验证方式：`go test ./write -count=1 -race`

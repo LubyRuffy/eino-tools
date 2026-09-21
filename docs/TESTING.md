@@ -32,6 +32,7 @@ go build ./cmd/mcpserver
 - `exec`：正常执行、管道/换行保真、不跟随 `$SHELL`、不读 rc、`cwd` 相对 `base_dir` 解析且允许落在边界外、超时杀前台进程组但不误杀已返回的后台任务、受保护域名拦截、`WithOutputListener` 在 `Wait` 前收到 stdout/stderr 分片
 - `read/write/edit/ls/tree/glob/grep`：路径解析允许落在 `base_dir` 边界外、基本文件操作和 patch/glob/grep 语义；`Config.AllowedPaths` / `ResolvePathWithin` 第三参已移除
 - `read`：编码探测覆盖 UTF-8 窗口截断、无 BOM 短 CJK、UTF-8 BOM 不进正文、真 GB18030（含窗口切在多字节中间）、非中文页回退 iso-8859-1、ASCII / 空文件；工具描述不含测试夹具词
+- `write`：缺 `content` 失败且不改原文件、空串写成空文件、非 string 类型错误、`contents`/`path` 近似键提示正确字段名、写后回读字节一致、相对路径落在 `DefaultBaseDir` 而非进程 cwd；成功句带解析后路径和字节数；工具描述不含测试夹具词
 - `edit`：缺成对字段、空 replace 删除、非 string 类型错误、未知字段列出收到的键、search 找不到、search/replace 优先于 patch；Info 写清两种模式
 - `internal/shared`：`LookupStringParam` 区分 omitted / 空串 / 非 string；`GetStringParam` 对非 string 仍静默变空
 - `grep`：超长行不 abort、默认跳过 `dist` / `.worktrees` 等目录名、尊重 `.gitignore`、命中上限、显式 `path` 仍可搜 skip 目录本身

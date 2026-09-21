@@ -50,7 +50,7 @@ _ = execTool
 
 `base_dir` 现在统一只作为相对路径解析锚点使用；`exec` 和文件读写类工具都允许最终路径落在 `base_dir` 之外。
 
-`exec` 跑的是非交互 bash，不读用户 rc，也不跟 `$SHELL`。需要边跑边看输出时，把 `WithOutputListener` 挂到 `Execute`/`InvokableRun` 的 ctx 上。`grep` 默认跳过构建/依赖/VCS 目录和 gitignore，不会被一份超长打包文件整死。`read` 按前 4096 字节探测编码：窗口切在 UTF-8 多字节中间仍判 `utf-8`，真 GB18030 才标 `gb18030`，UTF-8 BOM 不进正文。`edit` 的 `search_block`/`replace_block` 必须成对（空 replace 表示删除），否则走 `patch`；缺字段会写明还缺什么。
+`exec` 跑的是非交互 bash，不读用户 rc，也不跟 `$SHELL`。需要边跑边看输出时，把 `WithOutputListener` 挂到 `Execute`/`InvokableRun` 的 ctx 上。`grep` 默认跳过构建/依赖/VCS 目录和 gitignore，不会被一份超长打包文件整死。`read` 按前 4096 字节探测编码：窗口切在 UTF-8 多字节中间仍判 `utf-8`，真 GB18030 才标 `gb18030`，UTF-8 BOM 不进正文。`write` 的 `file_path` 和 `content` 都必填（字段名是 `content` 不是 `contents`）；空串会写成空文件，省略 `content` 会失败。成功表示解析后路径上的字节已经可读回，返回里带该路径和字节数。`edit` 的 `search_block`/`replace_block` 必须成对（空 replace 表示删除），否则走 `patch`；缺字段会写明还缺什么。
 
 如果需要统一配置网络代理，推荐同时引入 `netproxy`：
 
