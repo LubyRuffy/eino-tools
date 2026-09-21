@@ -90,6 +90,8 @@
 
 `edit` 只有两种模式：`search_block` 与 `replace_block` 必须成对出现（`replace_block` 为空串表示删除），或提供 `patch`。两者都给时 search/replace 优先。缺字段、类型不是 string、search 找不到，错误文案可区分，并会列出实际收到的键。
 
+`write` 的 `file_path` 与 `content` 都必填。省略 `content` 是缺参，空串是合法写空文件；非 string 报类型错误；收到 `contents` / `path` 这类近似键时点名正确字段。相对路径相对 `base_dir`/`DefaultBaseDir` 解析，不是进程 cwd。成功前会回读比对字节，成功句带解析后路径和字节数。
+
 `grep` 的仓库级搜索会跳过 `.git` / `node_modules` / `.worktrees` / `dist` / `vendor` 这类目录名，尊重 `.gitignore`，并在超长行、二进制或不可读文件上跳过而不是让整次 Walk 失败。命中有上限。用户显式传入的搜索根（例如 `path=dist`）本身不会被默认 skip。
 
 ### MCP Server

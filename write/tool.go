@@ -3,8 +3,6 @@ package write
 import (
 	"context"
 	"fmt"
-	"os"
-	"path/filepath"
 
 	"github.com/LubyRuffy/eino-tools/internal/fsutil"
 	"github.com/LubyRuffy/eino-tools/internal/shared"
@@ -34,16 +32,16 @@ func New(cfg Config) (*Tool, error) {
 func (t *Tool) Info(ctx context.Context) (*schema.ToolInfo, error) {
 	return &schema.ToolInfo{
 		Name: ToolName,
-		Desc: "Write content to a file.",
+		Desc: "Write the complete file body to disk. Both file_path and content are required. content is the full file text; the field name is content, not contents. Success means those bytes are readable back from the resolved path. Relative file_path is resolved against base_dir (or DefaultBaseDir), not the process working directory.",
 		ParamsOneOf: schema.NewParamsOneOfByParams(map[string]*schema.ParameterInfo{
 			"file_path": {
 				Type:     schema.String,
-				Desc:     "File path to write (relative to base_dir unless absolute).",
+				Desc:     "Target file path. Relative paths resolve against base_dir, not the process working directory.",
 				Required: true,
 			},
 			"content": {
 				Type:     schema.String,
-				Desc:     "Content to write to the file.",
+				Desc:     "Complete file body as a string. Field name is content, not contents. An empty string writes an empty file; omitting content is an error.",
 				Required: true,
 			},
 			"base_dir": {
@@ -67,21 +65,18 @@ func (t *Tool) InvokableRun(ctx context.Context, argumentsInJSON string, opts ..
 		return "", err
 	}
 
-	filePath := shared.GetStringParam(params, "file_path")
-	if filePath == "" {
-		return "", fmt.Errorf("file_path is required")
-	}
-	content := shared.GetStringParam(params, "content")
-
-	absPath, err := fsutil.ResolvePathWithin(baseDir, filePath)
+	payload, err := resolveWritePayload(params)
 	if err != nil {
 		return "", err
 	}
-	if err := os.MkdirAll(filepath.Dir(absPath), 0o755); err != nil {
-		return "", fmt.Errorf("failed to create directory: %w", err)
+
+	absPath, err := fsutil.ResolvePathWithin(baseDir, payload.filePath)
+	if err != nil {
+		return "", err
 	}
-	if err := os.WriteFile(absPath, []byte(content), 0o644); err != nil {
-		return "", fmt.Errorf("failed to write file: %w", err)
+	content := []byte(payload.content)
+	if err := writeVerified(absPath, content); err != nil {
+		return "", err
 	}
-	return fmt.Sprintf("Updated file %s", filePath), nil
+	return fmt.Sprintf("Updated file %s (%d bytes)", absPath, len(content)), nil
 }
