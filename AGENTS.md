@@ -57,3 +57,10 @@ go build ./cmd/mcpserver
 - 排查路径：用 `json.Marshal` 区分 omitted 与 `""`；断言看返回字符串里的 `error:`，不要只看 `err != nil`。`file_path` 错误文案里的 `path` 子串会让近似键断言假绿。
 - 修复要点：`LookupStringParam` 分流 omitted / 空串 / 类型错误；缺参列出收到的键并提示近似键；`WriteFile` 后 `ReadFile` 比对字节，对不上不准报成功；成功句带解析后路径和字节数。不要改 `GetStringParam` 的静默行为。
 - 验证方式：`go test ./write -count=1 -race`
+
+## 经验教训：Issue #10
+
+- HTTP bot wall 错误与 Cloudflare 人工验证错误分开；自动渲染失败保留前者分类，并在宿主自定义挑战检测前排除，防止再次启动浏览器或重试 HTTP。
+- 挑战资源可能在 Readability 提取时被剥离：内建渲染应先检查页面 HTML，宿主注入的渲染正文也要检查；厂商名字与普通客户端标签不等于挑战页。
+- 默认回归只用 `httptest` / 注入 fetcher；真实站点浏览器测试放到 `integration` build tag，避免全包测试意外出网。
+- 验证方式：`go test ./webfetch -count=1 -race`；结合覆盖率 profile 核对新增识别和一次渲染分支，不能把未运行的真实浏览器路径报成已验证。

@@ -42,6 +42,10 @@
 
 封装 HTTP 抓取、Readability 文本提取、可选渲染抓取与 Cloudflare 挑战回调。
 
+默认先 HTTP 抓取。401/403 响应中 `Server` 含 DataDome（不区分大小写），或存在 `X-DataDome` / `X-DataDome-*` 响应头时，使用独立 bot wall 错误触发一次已有渲染路径；不依赖 `BrowserFetch`，不进入 Cloudflare 的 `ChallengeHandler`。没有该信号的普通 401/403 仍返回 HTTP 错误，HTTP 200 JavaScript 空壳保留 `ShouldRetryWithRender` 重试。显式 `render=true` 直接渲染，失败后不再重复升级。
+
+渲染结果在返回和写入缓存前检查挑战页特征；内建 Rod 在正文提取前检查页面，宿主注入的 `RenderFetcher` 结果也检查。普通文章提及厂商名字不构成挑战页。升级失败的错误保留 HTTP 被拦截、浏览器渲染已尝试的上下文；挑战内容不返回、不缓存。升级成功使用原 `render=false` 缓存键，与显式 `render=true` 的缓存隔离。
+
 当通过 `cmd/mcpserver` 运行时，它与 `websearch` 共享同一个代理感知 `HTTPClient`，保证 `web_search` / `web_fetch` 的出网策略一致。
 
 当通过 `cmd/mcpserver` 运行时，默认 `render=true` 也会把同一套代理配置映射到 Rod launcher 的浏览器参数。
@@ -61,7 +65,7 @@
 - `CookieProvider`
 - `HTMLFetcher`
 - `RenderFetcher`
-  - `render=true` 的宿主覆盖点；若未注入则保持工具内建的 Rod 渲染实现，保证兼容
+  - 显式 `render=true`、bot wall 自动升级与 JavaScript 空壳重试共用的宿主覆盖点；若未注入则使用工具内建 Rod 实现和同一份 `ProxyConfig`
 - `ChallengeDetector`
 - `ChallengeHandler`
 

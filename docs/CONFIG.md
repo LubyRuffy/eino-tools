@@ -116,3 +116,5 @@
 - 显式 `BrowserBin` 路径无效时 render 启动失败；自动探测全部未命中时回退 Rod 默认
 - 只有在宿主要完全接管浏览器实现时，才需要显式注入 `RenderFetcher` 或 `BrowserFetch`
 - Cloudflare 受保护站点仍应通过 `CookieProvider` / `ChallengeHandler` 提供验证态；换浏览器引擎不能替代 cookie / 人工验证语义
+
+`web_fetch` 默认先 HTTP；仅 401/403 带 DataDome 响应信号时自动升级一次已有渲染路径。该路径与显式 `render=true` 一样调用 `RenderFetcher`，未注入时使用内建 Rod 和 `ProxyConfig`，不要求提供 `BrowserFetch` 或 `ChallengeHandler`。只设置自定义 `HTTPClient` 仍不能让浏览器推断代理，因此需要渲染时应一并传入 `ProxyConfig`。普通 401/403 不自动升级；渲染失败和仍为挑战页的结果不会写入成功缓存。

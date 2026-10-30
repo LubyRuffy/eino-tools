@@ -263,7 +263,9 @@ func main() {
 5. Cloudflare 站点请通过 `CookieProvider` / `ChallengeHandler` 提供验证态；默认仍使用 Rod，不会切换到 Playwright
 6. 如果业务需要完全接管浏览器实现，仍可显式注入 `RenderFetcher` 或 `BrowserFetch`
 
-宿主若希望接管 `render=true` 的执行后端，可注入 `RenderFetcher`；未注入时工具会继续使用库内建的默认 Rod render 实现。
+`web_fetch` 默认先 HTTP 抓取；仅当 401/403 响应带 DataDome bot wall 信号时，工具自动升级一次浏览器渲染。没有这类响应信号的 401/403 仍返回原 HTTP 错误；HTTP 200 的 JavaScript 空壳仍保留原有渲染重试。`render=true` 直接渲染。
+
+宿主若希望接管渲染后端，可注入 `RenderFetcher`；显式渲染和 bot wall 自动升级都调用它，未注入时使用库内建的 Rod 实现并复用 `ProxyConfig`。自动升级不依赖 `BrowserFetch`，也不进入 Cloudflare 的 `ChallengeHandler`。渲染失败会说明浏览器已经尝试；仍含挑战页特征的结果不会作为正文返回或缓存。升级成功沿用本次 `render=false` 缓存键，显式 `render=true` 缓存仍独立。
 
 `cmd/mcpserver` 会为 `web_search` 与 `web_fetch` 统一构造共享代理配置，并把它同时用于网络 `HTTPClient` 和默认 Rod 浏览器渲染链路。
 
