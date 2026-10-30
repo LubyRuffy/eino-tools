@@ -62,6 +62,8 @@ go run ./cmd/mcpserver
 
 这套代理配置会同时覆盖 `web_search`、`web_fetch` 普通抓取和 `web_fetch` 默认 `render=true` 渲染抓取。
 
+`web_fetch` 默认先 HTTP；401/403 带 DataDome bot wall 响应信号时自动升级一次已有浏览器渲染，沿用上述代理配置。`render=true` 直接渲染。普通 401/403 保留 HTTP 错误；升级失败会说明已尝试浏览器，挑战页不会作为成功正文返回或缓存。
+
 ## 传输说明
 
 - `stdio`：适合本地 MCP client 直接拉起命令

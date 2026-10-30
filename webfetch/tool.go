@@ -140,7 +140,7 @@ func New(cfg Config) (*Tool, error) {
 func (t *Tool) Info(ctx context.Context) (*schema.ToolInfo, error) {
 	return &schema.ToolInfo{
 		Name: ToolName,
-		Desc: "Fetch the content of a web page and extract the text (render mode returns Markdown via Readability)",
+		Desc: "Fetch a web page using HTTP first and extract readable text. A recognized bot wall rejection automatically upgrades once to browser rendering. render=true renders directly and returns Markdown via Readability.",
 		ParamsOneOf: schema.NewParamsOneOfByParams(map[string]*schema.ParameterInfo{
 			"url": {
 				Type:     schema.String,
@@ -149,7 +149,7 @@ func (t *Tool) Info(ctx context.Context) (*schema.ToolInfo, error) {
 			},
 			"render": {
 				Type:     schema.Boolean,
-				Desc:     "Optional: whether to render the page before extracting content. Default false.",
+				Desc:     "Optional: default false tries HTTP first and automatically upgrades once to browser rendering on a recognized bot wall rejection. Set render=true to render directly.",
 				Required: false,
 			},
 		}),
@@ -239,6 +239,10 @@ func (t *Tool) detectChallenge(err error, fallbackURL string) (string, bool) {
 	if err == nil {
 		return "", false
 	}
+	var botWall *botWallError
+	if errors.As(err, &botWall) {
+		return "", false
+	}
 	if cloudflare.IsChallengeError(err) {
 		return challengeURLFromError(err, fallbackURL), true
 	}
@@ -284,11 +288,26 @@ func (t *Tool) tryBrowserFetch(ctx context.Context, rawURL string, render bool) 
 
 func (t *Tool) executeFetch(ctx context.Context, rawURL string, render bool) (string, error) {
 	if render {
-		return t.renderFetcher(ctx, rawURL)
+		result, err := t.renderFetcher(ctx, rawURL)
+		if err != nil {
+			return "", err
+		}
+		if isBotWallPage(result) {
+			return "", &botWallError{}
+		}
+		return result, nil
 	}
 
 	htmlContent, err := t.htmlFetcher(ctx, rawURL)
 	if err != nil {
+		var botWall *botWallError
+		if errors.As(err, &botWall) {
+			result, renderErr := t.executeFetch(ctx, rawURL, true)
+			if renderErr != nil {
+				return "", fmt.Errorf("%w; browser rendering attempted once and failed: %w", err, renderErr)
+			}
+			return result, nil
+		}
 		return "", err
 	}
 
@@ -319,6 +338,10 @@ func (t *Tool) fetchHTML(ctx context.Context, rawURL string) (string, error) {
 		return "", fmt.Errorf("failed to fetch URL: %w", err)
 	}
 	defer resp.Body.Close()
+
+	if isHTTPBotWall(resp.StatusCode, resp.Header) {
+		return "", &botWallError{statusCode: resp.StatusCode}
+	}
 
 	body, err := io.ReadAll(resp.Body)
 	if err != nil {
@@ -426,6 +449,9 @@ func (t *Tool) fetchRenderedMarkdown(ctx context.Context, rawURL string) (string
 	html := ""
 	if body, err := page.HTML(); err == nil {
 		html = body
+	}
+	if isBotWallPage(html) {
+		return "", &botWallError{}
 	}
 	if cloudflare.DetectFromPageContent(title, pageURL, html) {
 		return "", &cloudflare.ChallengeError{

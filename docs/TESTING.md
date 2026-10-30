@@ -11,6 +11,9 @@ go test ./... -count=1
 go test ./browserbin -count=1
 go test ./netproxy -count=1
 go test ./websearch -count=1
+go test ./webfetch -count=1 -race
+go test ./webfetch -count=1 -coverprofile=/tmp/eino-tools-webfetch.cover
+go tool cover -func=/tmp/eino-tools-webfetch.cover
 go test ./webfetch ./exec ./read ./write ./edit ./ls ./tree ./glob ./grep ./pythonrunner ./screenshot -count=1
 go test ./internal/mcpserver ./cmd/mcpserver -count=1
 go build ./cmd/mcpserver
@@ -42,6 +45,22 @@ go build ./cmd/mcpserver
 - `internal/mcpserver`：正式工具列表、Eino 到 MCP 的 arguments 透传、`/sse` 和 `/mcp` 挂载、server 对客户端的工具列表暴露
 - `internal/mcpserver`：网络工具统一代理配置的 CLI 优先级与环境变量回退
 - `cmd/mcpserver`：默认参数、合法传输值、非法传输值校验、代理 flag 解析
+
+### web_fetch bot wall 回归（D1–D11）
+
+测试位于 `webfetch/tool_test.go`，只使用 `httptest` 或注入 fetcher，不请求真实站点，也不启动外部浏览器：
+
+旧的真实站点浏览器测试以 `integration` build tag 隔离，不参与默认测试命令及本次离线验收。
+
+- D1–D3：DataDome 401/403 响应升级一次 `RenderFetcher`；仅 `X-DataDome` 而无 `Server` 也可识别。
+- D4：无 DataDome 响应信号的普通 401/403 保留 HTTP 错误，渲染调用为零。
+- D5–D6：自动升级失败说明 HTTP 被拦截且浏览器已尝试，只渲染一次；显式 `render=true` 直接渲染一次，不先走 HTTP、不重复升级。
+- D7：具有稳定挑战资源特征的 HTML/Markdown 不能成功返回或缓存；普通文章提及厂商名字不误判。
+- D8–D9：Cloudflare 403 保留注入 `BrowserFetch` fallback；HTTP 200 JavaScript 空壳保留 `ShouldRetryWithRender` 重试。
+- D10：升级成功后相同 URL 的 `render=false` 可命中缓存；挑战页无成功缓存，显式渲染与默认模式缓存键仍隔离。
+- D11：工具描述及 `render` 参数说明默认先 HTTP、识别 bot wall 后自动升级一次、显式 `render=true` 直接渲染；描述与错误保持泛化。
+
+覆盖率验收关注新增响应识别、挑战页检测与「HTTP bot wall → 一次渲染」分支，新增语句覆盖率须达到 90%；不要用包含未启动 Rod 路径的全包覆盖率代替该分支的证据。
 
 ## 手工冒烟验证
 

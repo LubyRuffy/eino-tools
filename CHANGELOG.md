@@ -36,6 +36,7 @@
 
 ## Fixed
 
+- `web_fetch` 默认 HTTP 抓取遇到带 DataDome 响应信号的 401/403 时，自动通过已有 `RenderFetcher`（未注入时为内建 Rod）升级一次浏览器渲染，复用 `ProxyConfig`；普通 401/403 与 Cloudflare 回调路径保持原行为。渲染失败明确报告已尝试浏览器，仍为挑战页的结果不作为正文返回或写入缓存
 - `write` 缺 `content`、键名写成 `contents`、或把正文发成非 string 时仍返回 `Updated file` 并可能写成空文件；现按键是否存在区分 omitted 与空串，类型错误点名字段，近似键会提示正确字段名，写后回读比对字节，成功句带解析后路径和字节数
 - `edit` 把 search/replace 都标成可选，缺一个字段或空 replace 就甩同一句 `either...required`；现按键是否存在区分 omitted 与空串，空 replace 表示删除，非 string 报类型错误，缺载荷会列出实际收到的键；search/replace 与 patch 同时给时 search/replace 优先
 - `read` 把 4096 字节探测窗口切在多字节中间的合法 UTF-8 误判成 GB18030，正文变成乱码；现先裁不完整 UTF-8 尾再判定，真 GB18030 仍可检出，其余回退 iso-8859-1，UTF-8 BOM 不再进入正文
