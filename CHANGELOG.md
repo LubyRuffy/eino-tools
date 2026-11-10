@@ -36,6 +36,7 @@
 
 ## Fixed
 
+- `grep` 不再打开命名管道、设备或套接字。这类文件的 `open`/`read` 会一直阻塞，取消也等不到返回。遍历时检查上下文，取消后停止继续读。
 - `web_fetch` 默认 HTTP 抓取遇到带 DataDome 响应信号的 401/403 时，自动通过已有 `RenderFetcher`（未注入时为内建 Rod）升级一次浏览器渲染，复用 `ProxyConfig`；普通 401/403 与 Cloudflare 回调路径保持原行为。渲染失败明确报告已尝试浏览器，仍为挑战页的结果不作为正文返回或写入缓存
 - `write` 缺 `content`、键名写成 `contents`、或把正文发成非 string 时仍返回 `Updated file` 并可能写成空文件；现按键是否存在区分 omitted 与空串，类型错误点名字段，近似键会提示正确字段名，写后回读比对字节，成功句带解析后路径和字节数
 - `edit` 把 search/replace 都标成可选，缺一个字段或空 replace 就甩同一句 `either...required`；现按键是否存在区分 omitted 与空串，空 replace 表示删除，非 string 报类型错误，缺载荷会列出实际收到的键；search/replace 与 patch 同时给时 search/replace 优先

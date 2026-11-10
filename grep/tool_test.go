@@ -7,7 +7,9 @@ import (
 	"regexp"
 	"strconv"
 	"strings"
+	"syscall"
 	"testing"
+	"time"
 
 	"github.com/cloudwego/eino/components/tool"
 	"github.com/stretchr/testify/assert"
@@ -193,16 +195,52 @@ func TestSearchFile_SkipsUnreadableAndOversize(t *testing.T) {
 	tl, err := New(Config{DefaultBaseDir: tmpDir})
 	require.NoError(t, err)
 	re := regexp.MustCompile("needle")
-	assert.Empty(t, tl.searchFile(blocked, re))
-	assert.Empty(t, tl.searchFile(tmpDir, re))
+	got, searchErr := tl.searchFile(context.Background(), blocked, re)
+	require.NoError(t, searchErr)
+	assert.Empty(t, got)
+	got, searchErr = tl.searchFile(context.Background(), tmpDir, re)
+	require.NoError(t, searchErr)
+	assert.Empty(t, got)
 
 	big := filepath.Join(tmpDir, "big.txt")
 	require.NoError(t, os.WriteFile(big, make([]byte, maxGrepFileBytes+1), 0o644))
-	assert.Empty(t, tl.searchFile(big, re))
+	got, searchErr = tl.searchFile(context.Background(), big, re)
+	require.NoError(t, searchErr)
+	assert.Empty(t, got)
 
 	empty := filepath.Join(tmpDir, "empty.txt")
 	require.NoError(t, os.WriteFile(empty, nil, 0o644))
-	assert.Empty(t, tl.searchFile(empty, re))
+	got, searchErr = tl.searchFile(context.Background(), empty, re)
+	require.NoError(t, searchErr)
+	assert.Empty(t, got)
+}
+
+// Opening a named pipe waits for the other end. A workspace search must skip
+// it, or Stop cannot finish the turn while the read is stuck.
+func TestTool_InvokableRun_SkipsNamedPipeWithoutBlocking(t *testing.T) {
+	tmpDir := t.TempDir()
+	require.NoError(t, os.WriteFile(filepath.Join(tmpDir, "hit.txt"), []byte("needle\n"), 0o644))
+	require.NoError(t, syscall.Mkfifo(filepath.Join(tmpDir, "console.in"), 0o644))
+
+	tl, err := New(Config{DefaultBaseDir: tmpDir})
+	require.NoError(t, err)
+	done := make(chan string, 1)
+	go func() {
+		out, runErr := tl.InvokableRun(context.Background(), `{"pattern":"needle"}`)
+		if runErr != nil {
+			done <- "err:" + runErr.Error()
+			return
+		}
+		done <- out
+	}()
+	select {
+	case out := <-done:
+		require.NotContains(t, out, "err:")
+		assert.Contains(t, out, "hit.txt")
+		assert.NotContains(t, out, "console.in")
+	case <-time.After(2 * time.Second):
+		t.Fatal("grep blocked on a named pipe")
+	}
 }
 
 func TestTool_InvokableRun_InvalidPattern(t *testing.T) {

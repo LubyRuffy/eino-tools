@@ -4,6 +4,7 @@ import (
 	"bufio"
 	"bytes"
 	"context"
+	"errors"
 	"fmt"
 	"os"
 	"path/filepath"
@@ -121,11 +122,19 @@ func (t *Tool) InvokableRun(ctx context.Context, argumentsInJSON string, opts ..
 		return len(seen) >= DefaultMaxMatches
 	}
 
-	collect := func(path string) {
-		if path != absBasePath && ignore.SkipFile(path) {
-			return
+	collect := func(path string) error {
+		if err := ctx.Err(); err != nil {
+			return err
 		}
-		matches = append(matches, t.searchFile(path, re)...)
+		if path != absBasePath && ignore.SkipFile(path) {
+			return nil
+		}
+		found, err := t.searchFile(ctx, path, re)
+		if err != nil {
+			return err
+		}
+		matches = append(matches, found...)
+		return nil
 	}
 
 	if info.IsDir() {
@@ -135,11 +144,13 @@ func (t *Tool) InvokableRun(ctx context.Context, argumentsInJSON string, opts ..
 				return "", fmt.Errorf("invalid glob pattern: %w", globErr)
 			}
 			for _, file := range files {
-				fileInfo, statErr := os.Stat(file)
-				if statErr != nil || fileInfo.IsDir() {
+				fileInfo, statErr := os.Lstat(file)
+				if statErr != nil || !fileInfo.Mode().IsRegular() {
 					continue
 				}
-				collect(file)
+				if err := collect(file); err != nil {
+					return "", err
+				}
 				if limitReached() {
 					truncated = true
 					break
@@ -147,6 +158,9 @@ func (t *Tool) InvokableRun(ctx context.Context, argumentsInJSON string, opts ..
 			}
 		} else {
 			walkErr := filepath.Walk(absBasePath, func(path string, info os.FileInfo, walkErr error) error {
+				if err := ctx.Err(); err != nil {
+					return err
+				}
 				if walkErr != nil {
 					return nil
 				}
@@ -156,7 +170,14 @@ func (t *Tool) InvokableRun(ctx context.Context, argumentsInJSON string, opts ..
 					}
 					return nil
 				}
-				collect(path)
+				// A named pipe, device or socket blocks in open/read and does
+				// not observe cancellation. Skip it before opening.
+				if !info.Mode().IsRegular() {
+					return nil
+				}
+				if err := collect(path); err != nil {
+					return err
+				}
 				if limitReached() {
 					truncated = true
 					return filepath.SkipAll
@@ -164,11 +185,16 @@ func (t *Tool) InvokableRun(ctx context.Context, argumentsInJSON string, opts ..
 				return nil
 			})
 			if walkErr != nil {
+				if errors.Is(walkErr, context.Canceled) || errors.Is(walkErr, context.DeadlineExceeded) {
+					return "", walkErr
+				}
 				return "", fmt.Errorf("failed to walk directory: %w", walkErr)
 			}
 		}
-	} else {
-		collect(absBasePath)
+	} else if info.Mode().IsRegular() {
+		if err := collect(absBasePath); err != nil {
+			return "", err
+		}
 	}
 
 	return formatGrepMatches(baseDir, outputMode, matches, truncated), nil
@@ -220,14 +246,17 @@ func formatGrepMatches(baseDir, outputMode string, matches []grepMatch, truncate
 	}
 }
 
-func (t *Tool) searchFile(filePath string, re *regexp.Regexp) []grepMatch {
-	info, err := os.Stat(filePath)
-	if err != nil || info.IsDir() || info.Size() > maxGrepFileBytes {
-		return nil
+func (t *Tool) searchFile(ctx context.Context, filePath string, re *regexp.Regexp) ([]grepMatch, error) {
+	if err := ctx.Err(); err != nil {
+		return nil, err
+	}
+	info, err := os.Lstat(filePath)
+	if err != nil || !info.Mode().IsRegular() || info.Size() > maxGrepFileBytes {
+		return nil, nil
 	}
 	file, err := os.Open(filePath)
 	if err != nil {
-		return nil
+		return nil, nil
 	}
 	defer file.Close()
 
@@ -239,10 +268,10 @@ func (t *Tool) searchFile(filePath string, re *regexp.Regexp) []grepMatch {
 		head = nil
 	}
 	if bytes.IndexByte(head, 0) >= 0 {
-		return nil
+		return nil, nil
 	}
 	if _, err := file.Seek(0, 0); err != nil {
-		return nil
+		return nil, nil
 	}
 
 	scanner := bufio.NewScanner(file)
@@ -250,6 +279,9 @@ func (t *Tool) searchFile(filePath string, re *regexp.Regexp) []grepMatch {
 	var matches []grepMatch
 	lineNum := 1
 	for scanner.Scan() {
+		if err := ctx.Err(); err != nil {
+			return nil, err
+		}
 		line := scanner.Text()
 		if re.MatchString(line) {
 			matches = append(matches, grepMatch{Path: filePath, Line: lineNum, Content: line})
@@ -257,7 +289,7 @@ func (t *Tool) searchFile(filePath string, re *regexp.Regexp) []grepMatch {
 		lineNum++
 	}
 	if scanner.Err() != nil {
-		return nil
+		return nil, nil
 	}
-	return matches
+	return matches, nil
 }
