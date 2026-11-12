@@ -8,9 +8,9 @@ import (
 	osExec "os/exec"
 	"path/filepath"
 	"strings"
-	"syscall"
 	"time"
 
+	"github.com/LubyRuffy/eino-tools/internal/proctree"
 	"github.com/LubyRuffy/eino-tools/internal/shared"
 	"github.com/cloudwego/eino/components/tool"
 	"github.com/cloudwego/eino/schema"
@@ -68,8 +68,8 @@ func (t *Tool) Info(ctx context.Context) (*schema.ToolInfo, error) {
 				Required: true,
 			},
 			"requirements": {
-				Type: schema.Array,
-				Desc: "Optional pip requirement strings. Example: [\"requests==2.31.0\"]",
+				Type:     schema.Array,
+				Desc:     "Optional pip requirement strings. Example: [\"requests==2.31.0\"]",
 				ElemInfo: &schema.ParameterInfo{Type: schema.String},
 			},
 			"timeout_ms": {
@@ -185,7 +185,11 @@ func findPython() (string, error) {
 func runCmd(ctx context.Context, maxOutputBytes int, dir string, execPath string, args []string, extraEnv []string, stdin string) (string, string, int, error) {
 	cmd := osExec.CommandContext(ctx, execPath, args...)
 	cmd.Dir = dir
-	cmd.SysProcAttr = &syscall.SysProcAttr{Setpgid: true}
+	group, err := proctree.New(cmd)
+	if err != nil {
+		return "", "", -1, err
+	}
+	defer group.Close()
 	if stdin != "" {
 		cmd.Stdin = strings.NewReader(stdin)
 	}
@@ -201,6 +205,11 @@ func runCmd(ctx context.Context, maxOutputBytes int, dir string, execPath string
 	if startErr := cmd.Start(); startErr != nil {
 		return "", "", -1, startErr
 	}
+	if startErr := group.AfterStart(cmd); startErr != nil {
+		_ = cmd.Process.Kill()
+		_ = cmd.Wait()
+		return "", "", -1, startErr
+	}
 
 	done := make(chan error, 1)
 	go func() {
@@ -211,15 +220,11 @@ func runCmd(ctx context.Context, maxOutputBytes int, dir string, execPath string
 	select {
 	case <-ctx.Done():
 		if cmd.Process != nil {
-			if pgid, err := syscall.Getpgid(cmd.Process.Pid); err == nil {
-				_ = syscall.Kill(-pgid, syscall.SIGTERM)
-			}
+			group.Interrupt(cmd)
 			select {
 			case <-done:
 			case <-time.After(500 * time.Millisecond):
-				if pgid, err := syscall.Getpgid(cmd.Process.Pid); err == nil {
-					_ = syscall.Kill(-pgid, syscall.SIGKILL)
-				}
+				group.Kill(cmd)
 				_ = cmd.Process.Kill()
 			}
 		}

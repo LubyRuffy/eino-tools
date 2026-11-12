@@ -36,6 +36,7 @@
 
 ## Fixed
 
+- `exec` 与 `python_runner` 可以在 Windows 上编译。超时仍终止整棵仍在运行的进程树：Unix 保持进程组，Windows 在进程恢复运行前把它放进 Job Object。成功退出后不收割后台任务。`cmd/mcpserver` 在 Windows 上只监听中断信号。
 - `grep` 不再打开命名管道、设备或套接字。这类文件的 `open`/`read` 会一直阻塞，取消也等不到返回。遍历时检查上下文，取消后停止继续读。
 - `web_fetch` 默认 HTTP 抓取遇到带 DataDome 响应信号的 401/403 时，自动通过已有 `RenderFetcher`（未注入时为内建 Rod）升级一次浏览器渲染，复用 `ProxyConfig`；普通 401/403 与 Cloudflare 回调路径保持原行为。渲染失败明确报告已尝试浏览器，仍为挑战页的结果不作为正文返回或写入缓存
 - `write` 缺 `content`、键名写成 `contents`、或把正文发成非 string 时仍返回 `Updated file` 并可能写成空文件；现按键是否存在区分 omitted 与空串，类型错误点名字段，近似键会提示正确字段名，写后回读比对字节，成功句带解析后路径和字节数

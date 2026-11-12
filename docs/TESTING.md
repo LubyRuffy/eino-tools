@@ -41,6 +41,7 @@ go build ./cmd/mcpserver
 - `grep`：超长行不 abort、默认跳过 `dist` / `.worktrees` 等目录名、尊重 `.gitignore`、命中上限、显式 `path` 仍可搜 skip 目录本身
 - `internal/fsutil`：walk skip 目录名精确匹配、gitignore 否定规则、显式搜索根不 skip
 - `pythonrunner`：空代码、requirements、执行结果结构
+- `internal/proctree`：Unix 上命令成为自己的进程组，interrupt 与 kill 都能停掉它；没有进程或进程已不存在时不报错。Windows Job Object 由 `GOOS=windows go build ./...` 编译检查，本机不执行。
 - `screenshot`：路径规范化、区域解析、命令选择和 data URL
 - `internal/mcpserver`：正式工具列表、Eino 到 MCP 的 arguments 透传、`/sse` 和 `/mcp` 挂载、server 对客户端的工具列表暴露
 - `internal/mcpserver`：网络工具统一代理配置的 CLI 优先级与环境变量回退

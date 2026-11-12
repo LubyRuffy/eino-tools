@@ -10,11 +10,11 @@ import (
 	osExec "os/exec"
 	"path/filepath"
 	"strings"
-	"syscall"
 	"time"
 
 	"github.com/LubyRuffy/eino-tools/internal/cloudflare"
 	"github.com/LubyRuffy/eino-tools/internal/fsutil"
+	"github.com/LubyRuffy/eino-tools/internal/proctree"
 	"github.com/LubyRuffy/eino-tools/internal/shared"
 	"github.com/cloudwego/eino/components/tool"
 	"github.com/cloudwego/eino/schema"
@@ -290,7 +290,11 @@ func runCommandOnce(
 	execPath, execArgs := buildShellInvocation(shellPath, command)
 	cmd := osExec.CommandContext(ctx, execPath, execArgs...)
 	cmd.Dir = workDir
-	cmd.SysProcAttr = &syscall.SysProcAttr{Setpgid: true}
+	group, err := proctree.New(cmd)
+	if err != nil {
+		return nil, fmt.Errorf("failed to start command: %w", err)
+	}
+	defer group.Close()
 	// Background children inherit the stdout/stderr pipes. Without WaitDelay,
 	// cmd.Wait blocks until those children close the pipes (or until timeout
 	// kills the whole process group). WaitDelay lets the shell exit while
@@ -321,6 +325,11 @@ func runCommandOnce(
 	if err := cmd.Start(); err != nil {
 		return nil, fmt.Errorf("failed to start command: %w", err)
 	}
+	if err := group.AfterStart(cmd); err != nil {
+		_ = cmd.Process.Kill()
+		_ = cmd.Wait()
+		return nil, fmt.Errorf("failed to start command: %w", err)
+	}
 
 	done := make(chan error, 1)
 	go func() {
@@ -331,15 +340,11 @@ func runCommandOnce(
 	select {
 	case <-ctx.Done():
 		if cmd.Process != nil {
-			if pgid, err := syscall.Getpgid(cmd.Process.Pid); err == nil {
-				_ = syscall.Kill(-pgid, syscall.SIGTERM)
-			}
+			group.Interrupt(cmd)
 			select {
 			case <-done:
 			case <-time.After(500 * time.Millisecond):
-				if pgid, err := syscall.Getpgid(cmd.Process.Pid); err == nil {
-					_ = syscall.Kill(-pgid, syscall.SIGKILL)
-				}
+				group.Kill(cmd)
 				_ = cmd.Process.Kill()
 			}
 		}

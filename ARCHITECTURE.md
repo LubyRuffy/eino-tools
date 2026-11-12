@@ -15,6 +15,7 @@
 - `cmd/mcpserver`：可直接启动的 MCP server 入口
 - `internal/mcpserver`：Eino tools 到 MCP tools 的桥接、HTTP 端点挂载与 server 构造
 - `internal/shared`：参数解析、输出缓冲、工具错误处理
+- `internal/proctree`：命令超时要终止的进程组（Unix）或 Job Object（Windows）
 - `internal/cloudflare`：Cloudflare 检测与保护域名状态
 - `internal/fsutil`：`base_dir`、路径解析、显示路径，以及仓库级 walk 的默认 skip / gitignore 策略
 - `internal/editutil`：apply-patch 文本解析与替换
@@ -73,7 +74,7 @@
 
 封装非交互 bash 执行（`--noprofile --norc -c`，不跟随 `$SHELL`、不读 rc）、工作目录解析、输出截断、超时与 Cloudflare 保护域名拦截。
 
-超时只作用于仍在运行的命令进程组；shell 已经退出后留下的后台任务不会再被收割。`WaitDelay` 避免后台子进程占用 stdout/stderr 管道导致 `Wait` 一直挂到超时。超时数值只由 `timeout_ms` 决定，不按命令文本做特例。
+超时只作用于仍在运行的命令进程组；shell 已经退出后留下的后台任务不会再被收割。Unix 用进程组，Windows 用 Job Object，两者都只在超时或取消时终止仍在运行的树。`WaitDelay` 避免后台子进程占用 stdout/stderr 管道导致 `Wait` 一直挂到超时。超时数值只由 `timeout_ms` 决定，不按命令文本做特例。
 
 宿主可用 `WithOutputListener(ctx, fn)` 在 `Wait` 之前收到 stdout/stderr 分片。回调在进程的写路径上，不得久阻塞。每次回调拿到的是独立拷贝。未设置 listener 时行为与原来一致。
 

@@ -9,7 +9,6 @@ import (
 	"net/http"
 	"os"
 	"os/signal"
-	"syscall"
 
 	internalmcp "github.com/LubyRuffy/eino-tools/internal/mcpserver"
 	"github.com/modelcontextprotocol/go-sdk/mcp"
@@ -31,7 +30,7 @@ func run(parent context.Context, args []string) error {
 		return err
 	}
 
-	ctx, stop := signal.NotifyContext(parent, os.Interrupt, syscall.SIGTERM)
+	ctx, stop := signal.NotifyContext(parent, shutdownSignals()...)
 	defer stop()
 
 	server, err := internalmcp.BuildServer(ctx, cfg)
